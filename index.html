@@ -29,6 +29,22 @@ body{
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
 }
+.login{position:absolute;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(8,5,3,.62)}
+.login.on{display:flex}
+.login .card{width:min(84%,360px);max-height:94%;overflow:auto;box-sizing:border-box;background:#1e130b;border:3px solid var(--gold);border-radius:16px;padding:10px 16px 8px;box-shadow:0 10px 30px rgba(0,0,0,.6);font-family:inherit;color:var(--fg);text-align:center}
+.login h2{margin:0 0 6px;font-size:19px;color:#ffe9b0;font-weight:normal}
+.login .tabs{display:flex;gap:8px;margin-bottom:8px}
+.login .tabs button{flex:1;margin:0;padding:10px 0;font-size:16px;border:2px solid #6b4a2a;border-radius:10px;background:#2a1a0e;color:#e9d9b8}
+.login .tabs button.sel{background:linear-gradient(#f6d58a,#d4a640);color:#3a2410;border-color:#f6d58a}
+.login input{display:block;width:100%;box-sizing:border-box;margin:6px 0;padding:9px;font-size:17px;font-family:inherit;border:2px solid #6b4a2a;border-radius:10px;background:#140c06;color:#fff3d0;text-align:center;-webkit-user-select:text;user-select:text}
+.login input::placeholder{color:#8a7458}
+.login .go{width:100%;margin-top:4px;padding:10px;font-size:18px;font-family:inherit;border:0;border-radius:10px;background:linear-gradient(#f6d58a,#d4a640);color:#3a2410}
+.login .go:disabled{opacity:.6}
+.login .sub{width:100%;margin-top:4px;padding:8px;font-size:14px;font-family:inherit;border:2px solid #6b4a2a;border-radius:10px;background:transparent;color:#c9b48a}
+.login .msg{min-height:18px;font-size:14px;color:#ffb0a0;margin-top:4px}
+.login .note{font-size:12px;color:#a8946f;margin:2px 0 0}
+.login .row{display:flex;gap:8px}.login .row input{flex:1;min-width:0}
+@media (max-height:430px){.login h2{display:none}.login .note{display:none}}
 .stage{position:relative;width:min(100%,800px,calc((100vh - 72px) * 4 / 3))}
 @supports (height:100dvh){.stage{width:min(100%,800px,calc((100dvh - 72px) * 4 / 3))}}
 #game{
@@ -68,6 +84,7 @@ body{
 @media (prefers-reduced-motion:reduce){.act{transition:none}}
 </style>
 
+
 </head>
 <body>
 <div class="stage">
@@ -76,13 +93,14 @@ body{
     <button class="act off" id="act" type="button">대화</button>
   </div>
   <div class="login" id="login"><form class="card" id="loginForm" autocomplete="off">
-    <h2>마법사 등록 · 로그인</h2>
-    <p>처음이면 닉네임과 비밀번호를 정하면 바로 가입돼요</p>
-    <input id="nick" maxlength="10" placeholder="닉네임 (2~10자)" autocomplete="off">
-    <input id="pin" maxlength="4" inputmode="numeric" pattern="[0-9]*" type="password" placeholder="비밀번호 숫자 4자리" autocomplete="off">
-    <button type="submit" id="loginGo">시작하기</button>
+    <h2>마법사 로그인</h2>
+    <div class="tabs"><button type="button" id="tabNew" class="sel">처음이에요</button><button type="button" id="tabOld">이어서 하기</button></div>
+    <div class="row"><input id="nick" maxlength="10" placeholder="닉네임 (2~10글자)" autocomplete="off">
+    <input id="pin" maxlength="4" inputmode="numeric" pattern="[0-9]*" type="password" placeholder="비밀번호 4자리" autocomplete="off"></div>
+    <p class="note" id="loginNote">이 폰에서 하던 진행 상황은 그대로 이어져요</p>
+    <button type="submit" class="go" id="loginGo">만들기</button>
     <div class="msg" id="loginMsg"></div>
-    <button type="button" class="sub" id="loginGuest">로그인 없이 이 기기에서만 하기</button>
+    <button type="button" class="sub" id="loginGuest">나중에 하기 (이 폰에만 저장)</button>
   </form></div>
 </div>
 <p class="hint">
@@ -1794,9 +1812,11 @@ const Net = (() => {
 
   document.addEventListener('visibilitychange', () => { if (document.hidden) push(true); });
 
-  async function login(nick, pin) {
+  async function login(nick, pin, mode) {
     const h = hashPin(nick, pin);
     const r = await fetch(docUrl(nick));
+    if (r.status === 404 && mode !== 'new') return 'none';
+    if (r.ok && mode === 'new') return 'taken';
     if (r.status === 404) {                    // 처음 보는 닉네임 → 가입
       const c = await fetch(docUrl(nick) + '&currentDocument.exists=false', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: { ...fields(localSave()), pin: { stringValue: h } } }) });
       if (!c.ok) throw new Error('create');
@@ -1820,32 +1840,47 @@ const Net = (() => {
   };
 })();
 const loginEl = document.getElementById('login');
-function showLogin(v) { loginEl.classList.toggle('on', !!v); if (v) { document.getElementById('loginMsg').textContent = ''; } }
+let loginMode = 'new';
+function setLoginMode(m) {
+  loginMode = m;
+  document.getElementById('tabNew').classList.toggle('sel', m === 'new'); document.getElementById('tabOld').classList.toggle('sel', m === 'old');
+  document.getElementById('loginGo').textContent = m === 'new' ? '만들기' : '로그인';
+  document.getElementById('loginNote').textContent = m === 'new' ? '이 폰에서 하던 진행 상황은 그대로 이어져요' : '서버에 저장된 진행 상황을 불러와요';
+  document.getElementById('loginMsg').textContent = '';
+}
+function showLogin(v) { loginEl.classList.toggle('on', !!v); if (v) setLoginMode(hasSave() ? 'new' : loginMode); else if (document.activeElement) document.activeElement.blur(); }
+document.getElementById('tabNew').addEventListener('click', () => setLoginMode('new'));
+document.getElementById('tabOld').addEventListener('click', () => setLoginMode('old'));
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   const nick = document.getElementById('nick').value.trim(), pin = document.getElementById('pin').value.trim(), msg = document.getElementById('loginMsg'), go = document.getElementById('loginGo');
-  if (!/^[가-힣a-zA-Z0-9_]{2,10}$/.test(nick)) { msg.textContent = '닉네임은 한글·영어·숫자 2~10자로 정해 주세요'; return; }
+  if (!/^[가-힣a-zA-Z0-9_]{2,10}$/.test(nick)) { msg.textContent = '닉네임은 한글·영어·숫자 2~10글자예요'; return; }
   if (!/^\d{4}$/.test(pin)) { msg.textContent = '비밀번호는 숫자 4자리예요'; return; }
-  go.disabled = true; msg.style.color = '#6b4a2a'; msg.textContent = '확인하는 중…';
+  go.disabled = true; msg.style.color = '#e9d9b8'; msg.textContent = '연결 중…';
   try {
-    const r = await Net.login(nick, pin);
-    msg.style.color = '#a8322a';
-    if (r === 'wrong') { msg.textContent = '비밀번호가 달라요 (이미 있는 닉네임이면 다른 닉네임을 써 주세요)'; }
-    else { showLogin(false); document.activeElement && document.activeElement.blur(); Title.saved = hasSave(); Title.welcome = r === 'new' ? `${nick}님, 입학을 환영해요!` : `${nick}님, 다시 오셨군요!`; }
-  } catch (_) { msg.style.color = '#a8322a'; msg.textContent = '서버에 연결하지 못했어요. 인터넷을 확인하거나 아래 "로그인 없이"를 눌러 주세요'; }
+    const r = await Promise.race([Net.login(nick, pin, loginMode), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 12000))]);
+    msg.style.color = '#ffb0a0';
+    if (r === 'wrong') msg.textContent = '비밀번호가 달라요';
+    else if (r === 'none') msg.textContent = "없는 닉네임이에요. '처음이에요'로 만들어 주세요";
+    else if (r === 'taken') msg.textContent = "이미 있는 닉네임이에요. 내 닉네임이면 '이어서 하기'를 눌러 주세요";
+    else { showLogin(false); Title.saved = hasSave(); Title.welcome = r === 'new' ? `${nick}님, 입학을 환영해요!` : `${nick}님, 다시 오셨군요!`; }
+  } catch (_) { msg.style.color = '#ffb0a0'; msg.textContent = '서버에 연결하지 못했어요. 인터넷을 확인하고 다시 눌러 주세요'; }
   go.disabled = false;
 });
 document.getElementById('loginGuest').addEventListener('click', () => { Net.setGuest(); showLogin(false); });
-for (const id of ['nick', 'pin']) { const el = document.getElementById(id); el.addEventListener('keydown', e => e.stopPropagation()); el.addEventListener('pointerdown', e => e.stopPropagation()); }
-loginEl.addEventListener('pointerdown', e => e.stopPropagation());
+for (const id of ['nick', 'pin']) { const el = document.getElementById(id); el.addEventListener('keydown', e => e.stopPropagation()); }
+loginEl.addEventListener('pointerdown', e => { e.stopPropagation(); if (e.target === loginEl) showLogin(false); });
 const Title = {
-  enter() { this.t = 0; this.saved = hasSave(); this.confirmNew = false; if (Net.needLogin) showLogin(true); },
+  enter() { this.t = 0; this.saved = hasSave(); this.confirmNew = false; },
   buttons() {
+    if (Net.needLogin) return [{ id: 'login', label: '로그인 · 가입', size: 28, x: 290, y: 372, w: 220, h: 56 }, { id: 'guest', label: '로그인 없이 하기', size: 20, x: 290, y: 440, w: 220, h: 46 }];
     if (!this.saved) return [{ id: 'new', label: '게임 시작', size: 30, x: 290, y: 404, w: 220, h: 58 }];
     return [{ id: 'cont', label: '이어하기', size: 30, x: 290, y: 372, w: 220, h: 56 },
             { id: 'new', label: this.confirmNew ? '한 번 더 누르면 새로 시작' : '새로 시작', size: this.confirmNew ? 17 : 22, x: 290, y: 440, w: 220, h: 46 }];
   },
   press(id) {
+    if (id === 'login') { showLogin(true); return; }
+    if (id === 'guest') { Net.setGuest(); return; }
     if (id === 'cont') { fadeTo(() => { if (!loadGame()) { this.saved = false; Game.set('title'); } }); return; }
     if (this.saved && !this.confirmNew) { this.confirmNew = true; return; }
     fadeTo(() => { clearSave(); resetWorld(); Game.set('select'); });
@@ -1853,11 +1888,11 @@ const Title = {
   update(dt) {
     this.t += dt;
     if (loginEl.classList.contains('on')) return;
-    if (!fader.phase && (pressed.Enter || pressed.NumpadEnter || pressed.Space)) this.press(this.saved ? 'cont' : 'new');
+    if (!fader.phase && (pressed.Enter || pressed.NumpadEnter || pressed.Space)) this.press(Net.needLogin ? 'login' : this.saved ? 'cont' : 'new');
   },
   click(x, y) {
     if (loginEl.classList.contains('on')) return;
-    if (Net.user && y > 586 && Math.abs(x - OXv() - 400) < 160) { if (this.confirmOut) { Net.logout(); this.saved = false; this.welcome = ''; this.confirmOut = false; showLogin(true); } else this.confirmOut = true; return; }
+    if (Net.user && y > 586 && Math.abs(x - OXv() - 400) < 160) { if (this.confirmOut) { Net.logout(); this.saved = false; this.welcome = ''; this.confirmOut = false; } else this.confirmOut = true; return; }
     for (const b of this.buttons()) if (inside({ x: x - OXv(), y }, b)) { this.press(b.id); return; }
   },
   render(c) {
@@ -1905,7 +1940,7 @@ const Title = {
       text(c, b.label, 400, b.y + b.h / 2 + 1 - lift, b.size, warn ? '#8a2418' : '#5a3412');
     }
     c.globalAlpha = 0.6 + 0.4 * Math.sin(t * 3);
-    text(c, this.saved ? (Net.user ? '진행 상황은 서버에 자동 저장돼요' : '진행 상황은 이 기기에 자동 저장돼요') : IS_TOUCH ? '게임 시작을 눌러 주세요' : '클릭하거나 Enter 키를 누르세요', 400, this.saved ? 516 : 488, 16, '#f4fbf5', '#244a32', 4);
+    text(c, Net.needLogin ? '로그인하면 다른 기기에서도 이어서 할 수 있어요' : this.saved ? (Net.user ? '진행 상황은 서버에 자동 저장돼요' : '진행 상황은 이 기기에 자동 저장돼요') : IS_TOUCH ? '게임 시작을 눌러 주세요' : '클릭하거나 Enter 키를 누르세요', 400, this.saved || Net.needLogin ? 516 : 488, 16, '#f4fbf5', '#244a32', 4);
     c.globalAlpha = 1;
     text(c, '개인 소장용 팬 복원판', 400, 572, 13, 'rgba(235,245,236,.85)');
     if (Net.user) text(c, this.confirmOut ? '한 번 더 누르면 로그아웃 (이 기기의 저장은 지워지고 서버에는 남아요)' : `${Net.user.nick}님으로 로그인 중 · 로그아웃`, 400, 592, 12, this.confirmOut ? '#ffd0c0' : 'rgba(235,245,236,.85)');
@@ -3598,4 +3633,5 @@ requestAnimationFrame(frame);
 })();
 </script>
 
-</body></html>
+</body>
+</html>
