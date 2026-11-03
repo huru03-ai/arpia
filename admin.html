@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>아르피아 관리자</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<style>
+:root{--bg:#140805;--card:#24120b;--line:#5a2e1c;--gold:#f2c46a;--fg:#f4e6d0;--muted:#b49a82;--green:#7dff9a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"Jua","Apple SD Gothic Neo","Malgun Gothic",sans-serif;padding:20px 16px 40px}
+h1{margin:4px 0 18px;color:var(--gold);font-size:30px;font-weight:normal}
+.cards{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.card{flex:1 1 150px;max-width:260px;background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:12px 18px}
+.card small{display:block;color:var(--muted);font-size:15px}
+.card b{display:block;font-size:30px;font-weight:normal;margin-top:4px}
+.card b.on{color:var(--green)}
+.tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+input,select,button{font:inherit;font-size:17px;color:var(--fg);background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:10px 14px}
+input{flex:1 1 100%}
+input::placeholder{color:#7a5e4a}
+button{cursor:pointer}
+button.main{background:linear-gradient(#f6d58a,#d4a640);color:#3a2410;border:0;padding:14px 22px;font-size:19px}
+.wrap{overflow-x:auto;border-top:1px solid var(--line)}
+table{border-collapse:collapse;min-width:820px;width:100%}
+th{color:var(--gold);font-weight:normal;font-size:16px;text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:12px 10px;border-bottom:1px solid #3a1e12;font-size:16px;white-space:nowrap}
+td.n{text-align:right}th.n{text-align:right}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:#5a5a5a}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.msg{color:var(--muted);margin:14px 0}
+.err{color:#ffb0a0}
+#gate{text-align:center;margin-top:60px}
+#gate p{color:var(--muted)}
+</style>
+</head>
+<body>
+<h1>아르피아 관리자</h1>
+<div id="gate">
+  <p>관리자 구글 계정으로 로그인해 주세요</p>
+  <button class="main" id="loginBtn">구글로 로그인</button>
+  <p class="msg" id="gateMsg"></p>
+</div>
+<div id="app" hidden>
+  <div class="cards">
+    <div class="card"><small>지금 접속 중</small><b class="on" id="cOn">-</b></div>
+    <div class="card"><small>전체 가입자</small><b id="cAll">-</b></div>
+    <div class="card"><small>모두의 플레이 시간</small><b id="cTime">-</b></div>
+    <div class="card"><small>엔딩 본 사람</small><b id="cEnd">-</b></div>
+  </div>
+  <div class="tools">
+    <input id="q" placeholder="닉네임 검색">
+    <select id="sort"><option value="seen">최근 접속 순</option><option value="lv">레벨 순</option><option value="play">플레이 시간 순</option><option value="best">도전의 탑 순</option></select>
+    <button id="refresh">새로고침</button>
+    <button id="logout">로그아웃</button>
+  </div>
+  <p class="msg" id="msg">불러오는 중…</p>
+  <div class="wrap"><table>
+    <thead><tr><th></th><th>닉네임</th><th>주인공</th><th class="n">레벨</th><th>진행</th><th class="n">탑 최고</th><th class="n">도감</th><th class="n">마법석</th><th class="n">플레이 시간</th><th>마지막 접속</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+</div>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const ADMIN = 'pjonghun03@gmail.com';
+const app = initializeApp({ apiKey: 'AIzaSyC9c1row5M85taaLKid8Sllx8O5O9Ac7iU', authDomain: 'arpia-dc6c2.firebaseapp.com', projectId: 'arpia-dc6c2', appId: '1:531077790965:web:627b1e9e58d2ab072ed9bc' });
+const auth = getAuth(app), db = getFirestore(app);
+const $ = id => document.getElementById(id);
+const HERO = { kai: '카이', sera: '세라', luca: '루카', arin: '아린', roy: '로이', mina: '미나' };
+const fmt = s => { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h}시간 ${m}분` : `${m}분`; };
+const ago = t => { if (!t) return '-'; const m = (Date.now() - t) / 60000; return m < 2.5 ? '접속 중' : m < 60 ? `${Math.floor(m)}분 전` : m < 1440 ? `${Math.floor(m / 60)}시간 전` : `${Math.floor(m / 1440)}일 전`; };
+function chapter(qs) {                     // 퀘스트 기록으로 진행 중인 장 알아내기
+  const st = id => { const q = (qs || []).find(x => x.id === id); return q ? q.stage : null; };
+  if (st('tower') === 'done') return '엔딩 완료';
+  if (st('tower')) return '5장 봉인의 탑';
+  if (st('under')) return st('under') === 'done' ? '4장 완료' : '4장 지하 통로';
+  if (st('cave')) return st('cave') === 'done' ? '3장 완료' : '3장 얼음 동굴';
+  if (st('forest') || st('altar')) return '2장 어둠의 숲';
+  if (st('garden')) return '1장 정원';
+  return '시작 전';
+}
+let all = [];
+async function load() {
+  $('msg').textContent = '불러오는 중…'; $('msg').className = 'msg';
+  try {
+    const snap = await getDocs(collection(db, 'players'));
+    all = snap.docs.map(d => {
+      const f = d.data(); let s = {}; try { s = JSON.parse(f.save || '{}') || {}; } catch (_) {}
+      const stones = (s.inv || []).filter(Boolean).reduce((a, v) => a + (v.id === 'manaStone' ? (v.n || 1) : 0), 0);
+      return { nick: d.id, hero: HERO[f.hero || s.hero] || '-', lv: f.lv || s.lv || 1, ch: chapter(s.quests), best: s.best || 0,
+        codex: Object.keys(s.kills || {}).length, stones, play: f.playSec || s.playSec || 0, seen: f.updated ? f.updated.toMillis() : 0 };
+    });
+    draw(); $('msg').textContent = `${new Date().toLocaleTimeString('ko-KR')} 기준`;
+  } catch (e) { $('msg').textContent = '불러오지 못했어요: 규칙을 게시했는지, 관리자 계정으로 로그인했는지 확인해 주세요'; $('msg').className = 'msg err'; }
+}
+function draw() {
+  const q = $('q').value.trim(), key = $('sort').value;
+  const list = all.filter(p => !q || p.nick.includes(q)).sort((a, b) => key === 'seen' ? b.seen - a.seen : key === 'lv' ? b.lv - a.lv : key === 'play' ? b.play - a.play : b.best - a.best);
+  const live = p => Date.now() - p.seen < 150000;
+  $('cOn').textContent = all.filter(live).length; $('cAll').textContent = all.length;
+  $('cTime').textContent = fmt(all.reduce((a, p) => a + p.play, 0)); $('cEnd').textContent = all.filter(p => p.ch === '엔딩 완료').length;
+  $('rows').innerHTML = '';
+  for (const p of list) {
+    const tr = document.createElement('tr');
+    const cells = [['', ''], [p.nick], [p.hero], [`Lv.${p.lv}`, 'n'], [p.ch], [p.best ? `${p.best}층` : '-', 'n'], [`${p.codex}/17`, 'n'], [p.stones, 'n'], [fmt(p.play), 'n'], [ago(p.seen)]];
+    cells.forEach(([v, c], i) => { const td = document.createElement('td'); if (c) td.className = c; if (i === 0) { const d = document.createElement('span'); d.className = 'dot' + (live(p) ? ' on' : ''); td.appendChild(d); } else td.textContent = v; tr.appendChild(td); });
+    $('rows').appendChild(tr);
+  }
+  if (!list.length) $('rows').innerHTML = '<tr><td colspan="10" style="color:#b49a82">아직 가입한 사람이 없어요</td></tr>';
+}
+$('q').addEventListener('input', draw); $('sort').addEventListener('change', draw); $('refresh').addEventListener('click', load);
+$('logout').addEventListener('click', () => signOut(auth));
+$('loginBtn').addEventListener('click', async () => {
+  const pv = new GoogleAuthProvider(); pv.setCustomParameters({ prompt: 'select_account' });
+  try { await signInWithPopup(auth, pv); } catch (e) {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') signInWithRedirect(auth, pv);
+    else $('gateMsg').textContent = '로그인 실패: ' + (e.code || e.message);
+  }
+});
+getRedirectResult(auth).catch(e => { $('gateMsg').textContent = '로그인 실패: ' + (e.code || e.message); });
+onAuthStateChanged(auth, u => {
+  const ok = u && u.email === ADMIN;
+  $('gate').hidden = !!ok; $('app').hidden = !ok;
+  if (u && !ok) { $('gateMsg').textContent = `${u.email} 계정은 관리자가 아니에요`; signOut(auth); }
+  if (ok) load();
+});
+setInterval(() => { if (!$('app').hidden) load(); }, 60000);   // 1분마다 자동 새로고침
+</script>
+</body>
+</html>
