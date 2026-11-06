@@ -75,8 +75,11 @@ const ago = t => { if (!t) return '-'; const m = (Date.now() - t) / 60000; retur
 function chapter(qs) {                     // 퀘스트 기록으로 진행 중인 장 알아내기
   const st = id => { const q = (qs || []).find(x => x.id === id); return q ? q.stage : null; };
   if (st('tower') === 'done') return '엔딩 완료';
-  if (st('tower')) return '5장 봉인의 탑';
-  if (st('under')) return st('under') === 'done' ? '4장 완료' : '4장 지하 통로';
+  if (st('tower')) return '봉인의 탑';
+  if (st('under')) return st('under') === 'done' ? '지하 통로 완료' : '지하 통로';
+  if (st('ruin')) return st('ruin') === 'done' ? '6장 완료' : '6장 잠든 유적';
+  if (st('volc')) return st('volc') === 'done' ? '5장 완료' : '5장 불의 산';
+  if (st('lib')) return st('lib') === 'done' ? '4장 완료' : '4장 비밀 서고';
   if (st('cave')) return st('cave') === 'done' ? '3장 완료' : '3장 얼음 동굴';
   if (st('forest') || st('altar')) return '2장 어둠의 숲';
   if (st('garden')) return '1장 정원';
@@ -87,12 +90,20 @@ async function load() {
   $('msg').textContent = '불러오는 중…'; $('msg').className = 'msg';
   try {
     const snap = await getDocs(collection(db, 'players'));
-    all = snap.docs.map(d => {
-      const f = d.data(); let s = {}; try { s = JSON.parse(f.save || '{}') || {}; } catch (_) {}
-      const stones = (s.inv || []).filter(Boolean).reduce((a, v) => a + (v.id === 'manaStone' ? (v.n || 1) : 0), 0);
-      return { nick: d.id, hero: HERO[f.hero || s.hero] || '-', lv: f.lv || s.lv || 1, ch: chapter(s.quests), best: s.best || 0,
-        codex: Object.keys(s.kills || {}).length, stones, play: f.playSec || s.playSec || 0, seen: f.updated ? f.updated.toMillis() : 0 };
-    });
+    all = [];
+    for (const d of snap.docs) {
+      const f = d.data(), total = f.playSec || 0, seen = f.updated ? f.updated.toMillis() : 0;
+      const saves = [f.save, f.save2, f.save3].map(t => { try { return JSON.parse(t || 'null'); } catch (_) { return null; } });
+      let first = true;
+      saves.forEach((s, i) => {
+        if (!s) return;
+        const stones = (s.inv || []).filter(Boolean).reduce((a, v) => a + (v.id === 'manaStone' ? (v.n || 1) : 0), 0);
+        all.push({ nick: d.id, slot: i + 1, hero: HERO[s.hero] || '-', lv: s.lv || 1, ch: chapter(s.quests), best: s.best || 0,
+          codex: Object.keys(s.kills || {}).length, stones, play: s.playSec || 0, total, first, seen });
+        first = false;
+      });
+      if (first) all.push({ nick: d.id, slot: 1, hero: HERO[f.hero] || '-', lv: f.lv || 1, ch: '시작 전', best: 0, codex: 0, stones: 0, play: 0, total, first: true, seen });
+    }
     draw(); $('msg').textContent = `${new Date().toLocaleTimeString('ko-KR')} 기준`;
   } catch (e) { $('msg').textContent = '불러오지 못했어요: 규칙을 게시했는지, 관리자 계정으로 로그인했는지 확인해 주세요'; $('msg').className = 'msg err'; }
 }
@@ -100,12 +111,12 @@ function draw() {
   const q = $('q').value.trim(), key = $('sort').value;
   const list = all.filter(p => !q || p.nick.includes(q)).sort((a, b) => key === 'seen' ? b.seen - a.seen : key === 'lv' ? b.lv - a.lv : key === 'play' ? b.play - a.play : b.best - a.best);
   const live = p => Date.now() - p.seen < 150000;
-  $('cOn').textContent = all.filter(live).length; $('cAll').textContent = all.length;
-  $('cTime').textContent = fmt(all.reduce((a, p) => a + p.play, 0)); $('cEnd').textContent = all.filter(p => p.ch === '엔딩 완료').length;
+  $('cOn').textContent = new Set(all.filter(live).map(p => p.nick)).size; $('cAll').textContent = new Set(all.map(p => p.nick)).size;
+  $('cTime').textContent = fmt(all.reduce((a, p) => a + (p.first ? p.total : 0), 0)); $('cEnd').textContent = all.filter(p => p.ch === '엔딩 완료').length;
   $('rows').innerHTML = '';
   for (const p of list) {
     const tr = document.createElement('tr');
-    const cells = [['', ''], [p.nick], [p.hero], [`Lv.${p.lv}`, 'n'], [p.ch], [p.best ? `${p.best}층` : '-', 'n'], [`${p.codex}/17`, 'n'], [p.stones, 'n'], [fmt(p.play), 'n'], [ago(p.seen)]];
+    const cells = [['', ''], [p.nick + (p.slot > 1 || all.some(o => o.nick === p.nick && o.slot !== p.slot) ? ` · 슬롯${p.slot}` : '')], [p.hero], [`Lv.${p.lv}`, 'n'], [p.ch], [p.best ? `${p.best}층` : '-', 'n'], [`${p.codex}/17`, 'n'], [p.stones, 'n'], [p.first ? `${fmt(p.play)} (누적 ${fmt(p.total)})` : fmt(p.play), 'n'], [ago(p.seen)]];
     cells.forEach(([v, c], i) => { const td = document.createElement('td'); if (c) td.className = c; if (i === 0) { const d = document.createElement('span'); d.className = 'dot' + (live(p) ? ' on' : ''); td.appendChild(d); } else td.textContent = v; tr.appendChild(td); });
     $('rows').appendChild(tr);
   }
