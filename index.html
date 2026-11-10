@@ -263,7 +263,7 @@ function usePotion(id) {
   const key = it.heal.hp ? 'hp' : 'mp', max = key === 'hp' ? player.maxHp : player.maxMp;
   if (player[key] >= max) return { full: true, key };
   const amt = Math.min(Math.max(it.heal[key], Math.round(max * 0.35)), max - player[key]);   // 물약: 기본값과 최대치의 35% 중 큰 값
-  player[key] += amt; takeItem(id); Sound.sfx('heal'); if (typeof Field !== 'undefined') Field.introAdv('potion', 'report'); return { amt, key };
+  player[key] += amt; takeItem(id); Sound.sfx('heal'); return { amt, key };
 }
 
 class QuestManager {
@@ -285,7 +285,7 @@ class QuestManager {
       return { go: '어둠의 숲 오른쪽 위 제단을 찾아가자', warm: `알을 품고 돌아다니며 따뜻하게 하기 (${eg ? Math.min(100, Math.floor(eg.warm / EGG_WARM * 100)) : 0}%)`,
         feed: `알에게 줄 ${fd} 모으기 (${eg ? Math.min(EGG_FOOD_N, countItem(EGG_FOOD[eg.kind])) : 0}/${EGG_FOOD_N})`, fight: `알과 함께 전투하기 (${eg ? eg.fights : 0}/${EGG_FIGHTS})`, hatch: '제단으로 돌아가 알을 부화시키자' }[q.stage] || '';
     }
-    if (q.id === 'intro') return { rest: '기숙사 침대에서 쉬고 오자', buy: '오트의 가게에서 HP 물약 사기', magic: '정원의 슬라임을 마법으로 쓰러뜨리자', potion: '물약을 써 보자 (인벤토리나 전투 중)', report: '교장선생님께 보고하자' }[q.stage] || '';
+    if (q.id === 'intro') return { rest: '기숙사의 내 침대에서 쉬고 오자', magic: '정원의 슬라임을 마법으로 쓰러뜨리자', report: '교장선생님께 보고하자' }[q.stage] || '';
     if (q.id === 'study') return { hunt: `쿠키 ${q.got.cookie || 0}/${q.need.cookie} · 만드라고라 ${q.got.mandra || 0}/${q.need.mandra}`, report: '교장선생님께 결과를 보고하자' }[q.stage] || '';
     if (q.id === 'forest') return { collect: `검은 마력 조각 (${q.count}/${q.goal})`, boss: '그림자 워든을 물리치자', report: '조각을 교장선생님께 가져가자' }[q.stage] || '';
     if (q.id !== 'garden') return '';
@@ -875,6 +875,7 @@ function drawItemIcon(c, id, cx, cy, size) {
   if (!drawArt(c, it.icon, cx - r[2] * k / 2, cy - r[3] * k / 2, r[2] * k, r[3] * k) && id === 'manaStone') drawStone(c, cx, cy, size / 26);
 }
 function drawNPC(c, n, t) {
+  if (n.id === 'bossGate') { c.fillStyle = 'rgba(70,35,110,.45)'; c.beginPath(); c.ellipse(n.x, n.y, 64, 51, 0, 0, Math.PI * 2); c.fill(); const g = c.createRadialGradient(n.x, n.y, 6, n.x, n.y, 64); g.addColorStop(0, `rgba(255,220,120,${0.45 + 0.15 * Math.sin(t * 3)})`); g.addColorStop(1, 'rgba(255,220,120,0)'); c.fillStyle = g; c.fillRect(n.x - 70, n.y - 70, 140, 140); drawMagicCircle(c, n.x, n.y, t); drawMagicCircle(c, n.x, n.y, t + 1); return; }
   if (n.id === 'corrExit') return;               // 시련의 복도 입구 마법진 (바닥에 따로 그림)
   if (n.id === 'leon' || n.id === 'leon2') {
     const s = c3Art('leon'); if (!s) return;
@@ -1276,7 +1277,6 @@ function syncUnder() {
   m.npcs = m.npcs.filter(n => n.id !== 'sdoor' && n.id !== 'barrier');
   if (!open) m.npcs.push({ id: 'sdoor', name: '봉인 문', x: 17 * T, y: 10.5 * T, half: 18 });
   if (!q || !['report', 'done'].includes(q.stage)) m.npcs.push({ id: 'barrier', name: '결계 속 레온', x: 17 * T, y: 3.2 * T, half: 22 });
-  syncQuestBoss('under', 'under', 'knight', 16.5, 5.6);
 }
 // 레온: 3장을 받으면 숲 북쪽 길목에 나타남. 이기면 옆으로 비켜 줌
 function syncLeon() {
@@ -1291,8 +1291,8 @@ function syncHallLeon() {
 }
 function syncBoss() {
   syncHallLeon();
-  syncLeon(); syncUnder(); syncLib(); syncVolc(); syncRuin(); syncQuestBoss('ruins', 'ruin', 'gaia', 15, 4); syncQuestBoss('library', 'lib', 'librarian', 15, 6); syncQuestBoss('volcano', 'volc', 'ignis', 15, 4); syncQuestBoss('tower3', 'tower', 'azka', 12.5, 6.2); syncQuestBoss('cave', 'cave', 'golem', 15, 5);
-  syncQuestBoss('forest', 'forest', 'warden', 18, 12);
+  syncLeon(); syncUnder(); syncLib(); syncVolc(); syncRuin(); syncQuestBoss('tower3', 'tower', 'azka', 12.5, 6.2);
+  for (const [type, r] of Object.entries(BOSS_ROOMS)) syncBossRoom(type, r);
   const g = MAPS.garden; if (!g.mobs) return;
   const q = QM.get('garden'), want = !!(q && q.stage === 'boss'), has = g.mobs.some(b => b.type === 'boss');
   if (want && !has) g.mobs.push({ type: 'boss', boss: true, sx: 17, sy: 13, x: 17.5 * T, y: 13.5 * T, vx: 0, vy: 0, t: 1e9, anim: 0, alive: true, flip: false });
@@ -1303,6 +1303,14 @@ function syncQuestBoss(mapId, qid, type, tx, ty) {
   const q = QM.get(qid), want = !!(q && q.stage === 'boss'), has = g.mobs.some(b => b.type === type);
   if (want && !has) g.mobs.push({ type, boss: true, sx: tx, sy: ty, x: (tx + 0.5) * T, y: (ty + 0.5) * T, vx: 0, vy: 0, t: 1e9, anim: 0, alive: true, flip: false });
   if (!want && has) g.mobs = g.mobs.filter(b => b.type !== type);
+}
+// 보스 방: 던전 안쪽의 마법진 → 시련의 복도 → 보스 방. 보스를 물리친 뒤에도 마법진·복도·방은 그대로 남는다
+const BOSS_OPEN = ['boss', 'report', 'done', 'altar', 'rescue', 'vulca'];
+function syncBossRoom(type, r) {
+  const d = MAPS[r.from], q = QM.get(r.q), open = !!(q && BOSS_OPEN.includes(q.stage));
+  d.npcs = d.npcs.filter(n => !(n.id === 'bossGate' && n.boss === type));
+  if (open) d.npcs.push({ id: 'bossGate', boss: type, floor: true, name: '보스의 방', x: (r.gx + 0.5) * T, y: (r.gy + 0.5) * T, half: 30 });
+  syncQuestBoss('boss_' + type, r.q, type, 9.5, 5);
 }
 // 풀숲: 곳곳에 작은 무더기로 (y = 풀숲 타일). 걸어 다니다 가끔 몬스터가 튀어나온다
 (function () {
@@ -1345,10 +1353,17 @@ const CORR_SPEC = { 1: { len: 30, gap: 0.85, v: 200, big: 0 }, 2: { len: 36, gap
 const CORR_H = 11, CORR_SAFE = 4;                                   // 복도 높이(칸), 출발 안전지대 끝(칸)
 function buildCorr(lv, bossType, theme) {
   const S = CORR_SPEC[lv], w = CORR_SAFE + S.len + 4, g = grid(w, CORR_H); border(g, 2);
-  return { id: 'corr', name: `시련의 복도 · ${lv}단계`, theme, w, h: CORR_H, g, start: { x: 2.5, y: 6.3 }, stones: 0, npcs: [{ id: 'corrExit', name: '입구 마법진', x: 2.5 * T, y: 6.1 * T, half: 30 }], portals: {}, labels: [], signs: [], items: [], mobs: [], mobDefs: [],
+  return { id: 'corr', name: `시련의 복도 · ${lv}단계`, theme, w, h: CORR_H, g, start: { x: 2.5, y: 6.3 }, stones: 0, npcs: [{ id: 'corrExit', name: '입구 마법진', floor: true, x: 2.5 * T, y: 6.1 * T, half: 30 }], portals: {}, labels: [], signs: [], items: [], mobs: [], mobDefs: [],
     tint: 'rgba(30,10,50,.18)', corr: { lv, boss: bossType, endX: (w - 3) * T, obs: [], warn: [], nextT: 1.2, back: null } };
 }
 MAPS.corr = buildCorr(1, 'warden', 'cave');
+const BOSS_ROOMS = { warden: { from: 'forest', q: 'forest', gx: 18, gy: 12 }, golem: { from: 'cave', q: 'cave', gx: 15, gy: 5 }, librarian: { from: 'library', q: 'lib', gx: 15, gy: 6 },
+  ignis: { from: 'volcano', q: 'volc', gx: 15, gy: 4 }, gaia: { from: 'ruins', q: 'ruin', gx: 15, gy: 4 }, knight: { from: 'under', q: 'under', gx: 16.5, gy: 5.6 } };
+for (const [type, r] of Object.entries(BOSS_ROOMS)) {
+  const d = MAPS[r.from], g = grid(20, 14); border(g, 2); g[13][9] = g[13][10] = 'Y';
+  MAPS['boss_' + type] = { id: 'boss_' + type, name: d.name + ' · 보스의 방', theme: d.theme, w: 20, h: 14, g, start: { x: 10, y: 11.4 }, stones: 0, tint: d.tint, npcs: [], mobDefs: [], circle: { x: 10, y: 5.6 },
+    portals: { Y: { to: r.from, x: r.gx + 0.5, y: r.gy + 1.7, color: '#ffd35a' } }, labels: [{ x: 10, y: 12.55, text: d.name }] };
+}
 
 // 마법석을 각 맵의 빈 바닥에 무작위로 배치
 function spawnStones(m) {
@@ -2530,6 +2545,7 @@ function loadGame() {
   player.kills = d.kills || {}; player.best = d.best || 0; player.playSec = d.playSec || 0; player.robeOwned = !!d.robeOwned; player.robeOn = !!d.robeOn; Field.codexDone = !!d.codexDone;
   player.streak = d.streak || 0; player.buffs = d.buffs && d.buffs.atk ? d.buffs : { atk: 1, def: 0 };
   QM.list = (Array.isArray(d.quests) ? d.quests : []).filter(q => !(q.id === 'garden' && !q.stage));   // 예전 1마리 퀘스트는 새 퀘스트로 다시 받기
+  for (const q of QM.list) if (q.id === 'intro') { if (q.stage === 'buy') q.stage = 'magic'; else if (q.stage === 'potion') q.stage = 'report'; }   // 예전 저장: 물약 단계는 없어짐
   if (Array.isArray(d.slots)) { player.slots = d.slots.filter(x => typeof x === 'string'); player.seen = Array.isArray(d.seen) ? d.seen.slice() : []; }
   else {                                          // 예전 저장: 아는 마법 중 가장 센 4개를 칸에 넣는다
     const ids = allSkills().filter(skillKnown); player.seen = ids.slice();
@@ -2889,8 +2905,6 @@ const Field = {
         player.moving = false;
         const ft = b.boss && FTASKS.find(x => x.boss === b.type && ftActive(x));
         if (ft) { this.invuln = 1.6; joyRelease(); this.say(`먼저 현장 의뢰 「${ft.title}」부터 끝내자 (${ftText(ft)})`); continue; }
-        const cl = b.boss && CORR[b.type];
-        if (cl && !((player.tips || {}).corrDone || {})[b.type]) { this.invuln = 1.6; joyRelease(); this.corrAsk(b, cl); continue; }
         const pre = BOSS_PRE[b.type];
         if (pre && !b.talked) {   // 보스: 싸우기 전에 한마디
           b.talked = true; joyRelease();
@@ -2900,15 +2914,16 @@ const Field = {
       }
     }
   },
-  corrAsk(b, lv) {                                 // 보스 앞: 시련의 복도 안내
+  corrAsk(type, back, dest, gateName) {          // 보스의 방 가는 길: 시련의 복도 안내 → 복도로
+    const lv = CORR[type], ft = FTASKS.find(x => x.boss === type && ftActive(x));
+    if (ft) { this.say(`먼저 현장 의뢰 「${ft.title}」부터 끝내자 (${ftText(ft)})`); return; }
     const tp = player.tips = player.tips || {}, first = !tp.corr; tp.corr = 1;
-    const lines = first ? ['보스의 방으로 가는 길목에 오래된 시련의 문이 서 있다.', '문에 글귀가 새겨져 있다. 「시련의 복도를 통과한 자만 지나갈 수 있다. 장애물에 맞으면 최대 체력의 절반을 잃고, 물약과 두루마리는 쓸 수 없다. 쓰러지면 기숙사로 돌아간다.」', '체력은 지금 그대로 들어간다. 체력이 절반 이하라면 한 번만 맞아도 쓰러지니 미리 회복해 두자.', '들어서면 안전지대가 있고, 입구 마법진 위에서 대화 버튼을 누르면 언제든 들어오기 전 자리로 나갈 수 있다.', '출발선을 넘으면 앞에서 장애물이 계속 굴러온다. 경고 표시를 보고 피하면서 끝의 문까지 달려가자! 맞으면 출발선으로 돌아간다.']
-      : [`시련의 문이다. 이번에는 ${lv}단계. 복도를 통과해야 보스에게 갈 수 있다.`, `지금 HP ${player.hp}/${player.maxHp}. 맞으면 ${Math.ceil(player.maxHp / 2)}씩 깎인다.`];
-    this.dialog = { speaker: '시련의 문', icon: ICON[b.type], i: 0, lines, onEnd: () => {
-      const dx = player.x - b.x, dy = player.y - b.y, d0 = Math.hypot(dx, dy) || 1; let bx = player.x, by = player.y;
-      for (const d of [120, 95, 70]) { const nx = b.x + dx / d0 * d, ny = b.y + dy / d0 * d; if (this.mobFree(nx, ny)) { bx = nx; by = ny; break; } }
-      const back = { map: this.map.id, x: bx, y: by }, theme = this.map.theme;
-      fadeTo(() => { MAPS.corr = buildCorr(lv, b.type, theme); MAPS.corr.corr.back = back; this.corrBusy = false;
+    const alive = (MAPS[dest.map].mobs || []).some(x => x.alive && x.type === type), hpLine = `지금 HP ${player.hp}/${player.maxHp}. 맞으면 ${Math.ceil(player.maxHp / 2)}씩 깎인다.`;
+    const lines = first ? ['보스의 방으로 가려면 시련의 복도를 지나야 한다.', '마법진에 글귀가 새겨져 있다. 「시련의 복도를 통과한 자만 보스의 방에 닿는다. 장애물에 맞으면 최대 체력의 절반을 잃고, 물약과 두루마리는 쓸 수 없다. 쓰러지면 기숙사로 돌아간다.」', '체력은 지금 그대로 들어간다. 체력이 절반 이하라면 한 번만 맞아도 쓰러지니 미리 회복해 두자.', '들어서면 안전지대가 있고, 입구 마법진 위에서 대화 버튼을 누르면 언제든 들어오기 전 자리로 나갈 수 있다.', '출발선을 넘으면 앞에서 장애물이 계속 굴러온다. 경고 표시를 보고 피하면서 끝의 문까지 달려가자! 맞으면 출발선으로 돌아간다.']
+      : [alive ? `보스의 방으로 가는 시련의 복도다. 이번에는 ${lv}단계.` : `보스는 이미 물리쳤지만 시련의 복도는 그대로 남아 있다. ${lv}단계에 다시 도전할 수 있다.`, hpLine];
+    this.dialog = { speaker: gateName || '보스의 방', icon: ICON[type], i: 0, lines, onEnd: () => {
+      const theme = this.map.theme; joyRelease();
+      fadeTo(() => { MAPS.corr = buildCorr(lv, type, theme); Object.assign(MAPS.corr.corr, { back, dest }); this.corrBusy = false;
         Game.set('field', { map: 'corr' }); Field.invuln = 1.5; Field.say(`시련의 복도 ${lv}단계! 준비되면 출발! (마법진 위에서 대화 버튼을 누르면 나갈 수 있다)`); }); } };
     this.startPage();
   },
@@ -2921,8 +2936,8 @@ const Field = {
     const m = this.map, C = m.corr, S = CORR_SPEC[C.lv]; if (this.dialog || this.panel || fader.phase || this.swirl || this.corrBusy) return;
     if (player.x > C.endX) {
       this.corrBusy = true; joyRelease(); Sound.sfx('fanfare');
-      fadeTo(() => { const tp = player.tips = player.tips || {}; tp.corrDone = tp.corrDone || {}; tp.corrDone[C.boss] = 1;
-        Game.set('field', { map: C.back.map, x: C.back.x / T, y: C.back.y / T }); Field.invuln = 3.5; Field.say('시련 통과! 물약으로 체력을 채우고 보스에게 가자'); saveGame(); });
+      fadeTo(() => { const D = C.dest, alive = (MAPS[D.map].mobs || []).some(x => x.alive && x.type === C.boss);
+        Game.set('field', { map: D.map, x: D.x, y: D.y }); Field.invuln = 2; Field.say(alive ? '시련 통과! 보스의 방이다. 물약으로 체력을 채우고 도전하자' : '시련 통과! 보스의 방은 조용하다. 다시 걸어도 만만치 않은 길이었다'); saveGame(); });
       return;
     }
     const run = player.x > CORR_SAFE * T && player.x < C.endX - 7 * T;       // 출발선을 넘으면 장애물이 계속 나온다
@@ -3002,7 +3017,7 @@ const Field = {
       const ch = (g[ty] && g[ty][tx]) || '#';
       if (SOLID.has(ch)) return { tx, ty, ch };
     }
-    for (const n of this.map.npcs) if (Math.abs(x - n.x) < h + n.half && Math.abs(y - n.y) < h + n.half) return { npc: n };
+    for (const n of this.map.npcs) if (!n.floor && Math.abs(x - n.x) < h + n.half && Math.abs(y - n.y) < h + n.half) return { npc: n };   // 바닥 마법진(floor)은 밟고 지나갈 수 있음
     return null;
   },
   moveAxis(mx, my) {
@@ -3166,9 +3181,21 @@ const Field = {
     player.egg = { kind: k, warm: 0, fights: 0, stage: 'warm' }; this.eggSet('warm'); this.panel = null; Sound.sfx('heal');
     this.say(`${SPIRITS[k].name}의 알을 품에 안았다! 차갑게 식어 있다… 따뜻하게 해 주자`); saveGame();
   },
+  restBed(mine) {                                  // 침대에서 쉬기 (내 침대 대화 버튼 / 침대 옆 휴식): HP·MP 회복 + 가끔 좋은 꿈
+    player.hp = player.maxHp; player.mp = player.maxMp; Sound.sfx('heal');
+    const lost = player.streak >= 2 ? ' (연승 기록은 초기화)' : ''; player.streak = 0;
+    if (Math.random() < 0.2) {                 // 좋은 꿈: 20% 확률로 작은 선물
+      const g = [['hpPotion', 1], ['mpPotion', 1], ['manaStone', 2]][Math.floor(Math.random() * 3)]; addItem(g[0], g[1]);
+      this.say(`좋은 꿈을 꿨다! 머리맡에 ${ITEMS[g[0]].name} ${g[1]}개가 놓여 있다${lost}`);
+    } else this.say((mine ? '푹신한 내 침대에서 푹 쉬었다! HP와 MP가 모두 회복됐어요' : '푹 쉬었다! HP와 MP가 모두 회복됐어요') + lost);
+    saveGame(); this.introAdv('rest', 'magic');
+    const sp = player.spirit, cvq = QM.get('cave');
+    if (sp && sp.stage !== 2 && sp.lv >= SP_EVO && cvq && cvq.stage === 'done' && C3M.ready) fadeTo(() => { this.evo = { t: 0, dream: true }; this.panel = 'evolve'; joyRelease(); });   // 잠든 사이 깜짝 진화
+    else fadeTo(() => {});
+  },
   introAdv(from, to, quiet) {      // 입학 안내 퀘스트: 단계가 맞으면 다음 단계로
     const q = QM.get('intro'); if (!q || q.stage !== from) return '';
-    q.stage = to; const m = { buy: '푹 쉬었다! 이번엔 오트의 가게로 가서 HP 물약을 사 보자', magic: '물약을 샀다! 이제 정원의 슬라임을 마법으로 쓰러뜨려 보자', potion: '마법이 통했다! 이제 물약을 한 번 써 보자', report: '입학 안내를 모두 마쳤다! 교장선생님께 보고하자' }[to] || '';
+    q.stage = to; const m = { magic: '푹 쉬었다! 이제 로비 아래 정문으로 나가 정원의 슬라임을 마법으로 쓰러뜨려 보자', report: '마법이 통했다! 입학 안내를 모두 마쳤다. 교장선생님께 보고하자' }[to] || '';
     if (m && !quiet) this.say(m); saveGame(); return m;
   },
   plateTick() {        // 유적 발판: 위로 걸어가면 눌린다 (순서가 틀리면 함정)
@@ -3296,6 +3323,7 @@ const Field = {
   },
   talk(n) {
     if (n.id === 'corrExit') { this.corrLeave(); return; }
+    if (n.id === 'bossGate') { const r = BOSS_ROOMS[n.boss]; this.corrAsk(n.boss, { map: this.map.id, x: n.x, y: n.y + 1.2 * T }, { map: 'boss_' + n.boss, x: 10, y: 11.4 }, '보스의 방 마법진'); return; }
     if (n.id === 'principal') { const ft = FTASKS.find(x => x.post && (ftActive(x) || (!ftState(x) && (QM.get(x.q) || {}).stage === 'report'))); if (ft) { this.dialog = { speaker: NAMES.principal, portrait: PORTRAIT, i: 0, lines: ftActive(ft) ? [`보고는 반갑다만, ${FT_WHO[ft.who]().speaker}의 부탁이 남았다고 들었다. 「${ft.title}」`, `지금까지: ${ftText(ft)}. 맡은 일은 끝까지 해내고 오거라.`] : [`보고는 나중에 받으마. 먼저 ${FT_WHO[ft.who]().speaker}에게 들러 보거라.`, '일을 마치고 오면 그때 천천히 듣겠다.'] }; this.startPage(); return; } }
     if (this.errandTalk(n)) return;
     if (/^lever\d$/.test(n.id)) {
@@ -3353,7 +3381,7 @@ const Field = {
     }
     if (/^bed\d$/.test(n.id)) {
       const i = n.slot, d = i === SLOT ? null : readSlot(i);
-      if (i === SLOT) { player.hp = player.maxHp; player.mp = player.maxMp; Sound.sfx('heal'); this.say('푹신한 내 침대에서 잠깐 쉬었다. HP와 MP가 모두 회복됐다! (다른 침대의 친구를 깨우면 그 캐릭터로 바꿔 할 수 있어요)'); saveGame(); return; }
+      if (i === SLOT) { this.restBed(true); return; }
       this.wake = { i, d }; this.panel = 'wake'; joyRelease(); Sound.sfx('click'); return;   // 다른 캐릭터 깨우기 / 빈 침대에 새 캐릭터 만들기
     }
     if (n.id === 'vulca') {
@@ -3503,13 +3531,14 @@ const Field = {
     const q = QM.get('garden'); let lines, onEnd = null;
     if (!q) {
       const iq = QM.get('intro');
+      if (iq && iq.stage === 'buy') iq.stage = 'magic'; else if (iq && iq.stage === 'potion') iq.stage = 'report';   // 예전 저장: 물약 단계는 없어짐
       if (!iq) {
         lines = ['아르피아에 온 것을 환영한다.', '정식 시험을 보기 전에 학교 생활부터 익혀야지.',
-                 '기숙사에서 푹 쉬고 오너라. 그다음엔 오트의 가게에서 HP 물약을 하나 사 보고, 정원의 슬라임을 마법으로 쓰러뜨려 보거라.', '물약값으로 마법석 세 개를 주마. 다 해 보면 나에게 돌아오거라.'];
+                 '먼저 기숙사의 내 침대에서 푹 쉬고 오너라. 그다음엔 정원의 슬라임을 마법으로 쓰러뜨려 보거라.', '입학 선물로 마법석 세 개를 주마. 나중에 쓸 일이 있을 게다. 다 해 보면 나에게 돌아오거라.'];
         onEnd = () => { QM.accept({ id: 'intro', title: '입학 안내', goal: 1, stage: 'rest', giver: NAMES.principal }); addItem('manaStone', 3); this.say('새 퀘스트를 받았다: 입학 안내 (마법석 3개)'); saveGame(); };
       } else if (iq.stage !== 'report') {
-        lines = { rest: ['먼저 기숙사로 가서 침대에서 쉬고 오너라.', '침대 가까이 가서 Space(폰은 휴식 버튼)를 누르면 된단다.'], buy: ['오트의 가게는 로비 왼쪽 위에 있단다.', 'HP 물약을 하나 사 오너라. 마법석 세 개면 된단다.'],
-                  magic: ['정원에서 슬라임과 싸울 때 화면 오른쪽 아래의 마법 버튼을 눌러 쓰거라.', 'MP가 허락하는 만큼 마법을 쓰는 게 기본기란다.'], potion: ['이제 물약을 한 번 써 보거라.', '인벤토리에서 물약을 누르거나, 전투 중 \'아이템\'을 고르면 된단다.'] }[iq.stage] || ['어서 가 보거라.'];
+        lines = { rest: ['먼저 기숙사로 가서 침대에서 쉬고 오너라. 기숙사는 로비 오른쪽 문이란다.', '"내 침대"라고 쓰인 침대 가까이 가서 Space(폰은 대화 버튼)를 누르면 된단다. 다른 침대는 친구 캐릭터 자리란다.'],
+                  magic: ['정원에서 슬라임과 싸울 때 화면 오른쪽 아래의 마법 버튼을 눌러 쓰거라.', 'MP가 허락하는 만큼 마법을 쓰는 게 기본기란다.'] }[iq.stage] || ['어서 가 보거라.'];
       } else {
         lines = ['안내를 모두 마쳤구나! 이제 정식 시험이다.', '요즘 정원에 슬라임들이 불어나 소란을 피우고 있단다.', '정원의 슬라임 3마리를 처치하고 오거라. 다치면 기숙사에서 쉬는 것도 잊지 말거라.'];
         onEnd = () => {
@@ -3521,7 +3550,7 @@ const Field = {
     } else if (q.stage === 'hunt') {
       lines = ['정원은 로비 아래쪽 정문으로 나가면 된단다.', `정원을 돌아다니는 슬라임과 부딪치면 싸움이 시작된단다. ${q.goal - q.count}마리 더 처치하고 오거라.`];
     } else if (q.stage === 'boss') {
-      lines = ['정원 한가운데에서 거대한 기운이 느껴지는구나… 로비 정문으로 나가 정원 가운데로 가 보거라.', '킹 슬라임이다. 다치면 기숙사 침대에서 푹 쉬거라. HP와 MP가 모두 차오른단다.', '만전의 상태로 도전하거라. 놈이 몸을 부풀리면 큰 공격이 온다!'];
+      lines = ['정원 한가운데에서 거대한 기운이 느껴지는구나… 로비 정문으로 나가 정원 가운데로 가 보거라.', '킹 슬라임이다. 이번 상대는 지금까지와 다르니 준비를 단단히 하거라.', '슬라임을 잡으며 모은 마법석이 있지? 오트의 가게(로비 위쪽)에서 HP 물약을 사 두거라. 한 병에 마법석 세 개란다.', '싸우다 위험하면 전투의 \'아이템\'에서 물약을 마시면 된단다. 다치면 기숙사 침대에서 쉬는 것도 잊지 말거라.', '놈이 몸을 부풀리면 큰 공격이 온다!'];
     } else if (q.stage === 'report') {
       lines = ['오오, 킹 슬라임을 물리쳤단 말이냐!', '입학한 지 얼마 되지도 않았는데 정말 대단하구나. 아르피아의 자랑이다.'];
       onEnd = () => {
@@ -3787,18 +3816,7 @@ const Field = {
         if (pressed.KeyQ) this.togglePanel('quest');
         }
         if (!this.panel && pressed.Space && this.near) this.talk(this.near);
-        else if (!this.panel && pressed.Space && this.nearBed) {
-          player.hp = player.maxHp; player.mp = player.maxMp;
-          const lost = player.streak >= 2 ? ' (연승 기록은 초기화)' : ''; player.streak = 0;
-          if (Math.random() < 0.2) {                 // 좋은 꿈: 20% 확률로 작은 선물
-            const g = [['hpPotion', 1], ['mpPotion', 1], ['manaStone', 2]][Math.floor(Math.random() * 3)]; addItem(g[0], g[1]);
-            this.say(`좋은 꿈을 꿨다! 머리맡에 ${ITEMS[g[0]].name} ${g[1]}개가 놓여 있다${lost}`);
-          } else this.say('푹 쉬었다! HP와 MP가 모두 회복됐어요' + lost);
-          saveGame(); this.introAdv('rest', 'buy');
-          const sp = player.spirit, cvq = QM.get('cave');
-          if (sp && sp.stage !== 2 && sp.lv >= SP_EVO && cvq && cvq.stage === 'done' && C3M.ready) fadeTo(() => { this.evo = { t: 0, dream: true }; this.panel = 'evolve'; joyRelease(); });   // 잠든 사이 깜짝 진화
-          else fadeTo(() => {});
-        }
+        else if (!this.panel && pressed.Space && this.nearBed) this.restBed(false);
       }
     }
     let dx = 0, dy = 0;
@@ -3829,6 +3847,7 @@ const Field = {
       }
       const p = m.portals[this.tileAt(player.x, player.y)];
       if (p && p.lock && p.lock()) { const lm = typeof p.lockMsg === 'function' ? p.lockMsg() : p.lockMsg; if (lm) { player.x = ox; player.y = oy; this.say(lm); } }
+      else if (p && p.to === 'tower3' && QM.get('tower')) { player.x = ox; player.y = oy + 30; joyRelease(); this.corrAsk('azka', { map: m.id, x: player.x, y: player.y }, { map: 'tower3', x: p.x, y: p.y }, '꼭대기로 가는 계단'); }
       else if (p) fadeTo(() => this.load(p.to, p.x, p.y));
     }
     this.updateMobs(dt);
@@ -3914,7 +3933,7 @@ const Field = {
         if (!takeItem('manaStone', it.price)) { this.say('마법석이 부족해요'); return; }
         if (r.id === 'robe') { player.robeOwned = true; player.robeOn = true; Sound.sfx('fanfare'); this.say('전설의 로브를 샀다! 바로 입었어요 (시스템 창에서 벗을 수 있어요)'); saveGame(); return; }
         if (!addItem(r.id)) { addItem('manaStone', it.price); this.say('인벤토리가 가득 찼어요'); return; }
-        this.say(`${it.name}을 샀다!`); Sound.sfx('coin'); saveGame(); if (r.id === 'hpPotion') this.introAdv('buy', 'magic'); return;
+        this.say(`${it.name}을 샀다!`); Sound.sfx('coin'); saveGame(); return;
       }
     }
     if (this.panel === 'system' && inside({ x, y }, SOUND_BTN)) { Sound.toggle(); return; }
@@ -4115,8 +4134,8 @@ function codexSeen(k) {
 }
 const codexCount = () => CODEX.filter(codexSeen).length;
 // 도전의 탑: 층마다 10%씩 강해지고 5층마다 보스
-const CHAL_POOL = ['slime', 'cookie', 'mandra', 'spikehog', 'shroomy', 'bunny', 'bat', 'rat', 'armor', 'imp', 'garg'];
-const CHAL_BOSS = ['boss', 'warden', 'golem', 'knight', 'azka'];
+const CHAL_POOL = ['slime', 'cookie', 'mandra', 'spikehog', 'shroomy', 'bunny', 'bat', 'bookworm', 'flybook', 'dust', 'lizard', 'spark', 'ashbat', 'mossgolem', 'turtle', 'scorpion', 'rat', 'armor', 'imp', 'garg'];
+const CHAL_BOSS = ['boss', 'warden', 'golem', 'librarian', 'ignis', 'gaia', 'knight', 'azka'];
 const AREA_REC = { garden: 3, forest: 9, cave: 13, library: 15, volcano: 17, ruins: 19, under: 21, tower: 23 };   // 현장 의뢰·자유 사냥으로 2~4레벨 높게 오는 것을 기준으로   // 지역별 권장 레벨
 // 정령 필살기가 생긴 만큼 체력을 올림 (정령이 없거나 막 얻은 1~2장 몬스터는 그대로): 일반 +10%, 보스 +18%
 for (const m of Object.values(MOB_INFO)) if (m.area !== 'garden' && m.area !== 'forest') m.hp = Math.round(m.hp * (m.boss ? 1.18 : 1.1));
@@ -4648,7 +4667,7 @@ const Battle = {
       }
       if (Math.random() < 0.2) { const pid = Math.random() < 0.5 ? 'hpPotion' : 'mpPotion'; if (addItem(pid)) loot += ` · ${ITEMS[pid].name}`; }
       { const em = Field.eggFight(); if (em) this.caveMsg = em; loot += Field.errandKill(this.mob.type); loot += Field.taskKill(this.mob.type); if (player.spirit) loot += Field.errandKill('spwin');
-        if (this.usedMagic && this.mob.type === 'slime') { const im = Field.introAdv('magic', 'potion', true); if (im && !this.caveMsg) this.caveMsg = im; } }
+        if (this.usedMagic && this.mob.type === 'slime') { const im = Field.introAdv('magic', 'report', true); if (im && !this.caveMsg) this.caveMsg = im; } }
       const tq = QM.get('tower');
       if (this.info.area === 'tower' && tq && tq.stage === 'climb') {   // 탑: 층마다 몬스터 3마리
         const fl = Field.map && Field.map.id;
@@ -4720,8 +4739,8 @@ const Battle = {
         if (mob.chal) { Field.say(`도전을 멈췄다. 기록 ${mob.floor - 1}층 · 최고 ${player.best}층`); saveGame(); return; }
         if (mob.rematch) { Field.say(r === 'win' ? '재도전 승리! 다시 봐도 강한 상대였다' : '재도전을 마쳤다'); saveGame(); return; }
         const q = QM.get('garden');
-        if (r === 'win' && this.bossAppeared === 'garden') Field.say('정원 한가운데에 거대한 기운이 나타났다! 킹 슬라임이다');
-        else if (r === 'win' && this.bossAppeared === 'forest') Field.say('숲 한가운데에서 그림자가 일렁인다! 그림자 워든이다');
+        if (r === 'win' && this.bossAppeared === 'garden') Field.say('정원 한가운데에 킹 슬라임이 나타났다! 싸우기 전에 오트의 가게에서 HP 물약을 사 두자 (마법석 3개)');
+        else if (r === 'win' && this.bossAppeared === 'forest') Field.say('숲 한가운데에 보스의 방 마법진이 나타났다! 그림자 워든이 기다린다');
         else if (r === 'win' && mob.type === 'boss') Field.say('퀘스트 갱신: 교장선생님께 결과를 보고하자');
         else if (r === 'win' && this.bossAppeared === 'tower') Field.say('탑 2층 정화 완료! 꼭대기에서 거대한 마력이 느껴진다');
         else if (r === 'win' && mob.type === 'azka') {
@@ -4731,7 +4750,7 @@ const Battle = {
         }
         else if (r === 'win' && this.bossAppeared === 'door') Field.say('열쇠 조각 3개를 모았다! 지하 북쪽의 봉인 문으로 가자');
         else if (r === 'win' && mob.type === 'knight') Field.say('어둠의 기사를 물리쳤다! 결계 속 레온에게 가 보자');
-        else if (r === 'win' && this.bossAppeared === 'cave') Field.say('화로 3개가 모두 켜졌다! 동굴 위쪽에서 프로스트 골렘이 깨어났다');
+        else if (r === 'win' && this.bossAppeared === 'cave') Field.say('화로 3개가 모두 켜졌다! 동굴 위쪽에 보스의 방 마법진이 나타났다');
         else if (r === 'win' && this.caveMsg) Field.say(this.caveMsg);
         else if (r === 'win' && mob.type === 'golem') Field.say('퀘스트 갱신: 교장선생님께 결과를 보고하자');
         else if (r === 'win' && mob.type === 'leon') {
