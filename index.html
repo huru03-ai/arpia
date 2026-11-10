@@ -217,7 +217,7 @@ const player = { x: 0, y: 0, half: 12, speed: 190, element: ELEMENTS.fire, hero:
   lv: 1, hp: 100, maxHp: 100, mp: 50, maxMp: 50, exp: 0, nextExp: 123, errands: {} };
 const ITEMS = {
   manaStone: { name: '마법석', icon: 'stone', desc: '마력이 깃든 보라색 돌. 상점에서 물약과 바꿀 수 있어요.' },
-  hpPotion:  { name: 'HP 물약', icon: 'hp', desc: 'HP를 35% 회복해요.', heal: { hp: 50 }, price: 3 },
+  hpPotion:  { name: 'HP 물약', icon: 'hp', desc: 'HP를 50 또는 최대 HP의 35% 중 큰 만큼 회복해요.', heal: { hp: 50 }, price: 3 },
   jelly:     { name: '슬라임 젤리', icon: 'jelly', loot: true, desc: '말랑말랑한 슬라임 조각. 연금술 재료예요.' },
   crumb:     { name: '쿠키 부스러기', icon: 'crumb', loot: true, desc: '달콤한 냄새가 나는 부스러기. 연금술 재료예요.' },
   leaf:      { name: '만드라고라 잎', icon: 'leaf', loot: true, desc: '싱싱한 만드라고라 잎. 연금술 재료예요.' },
@@ -227,9 +227,12 @@ const ITEMS = {
   grdElixir:  { name: '수호의 비약', icon: 'elixirGrd', desc: '다음 1회 전투 동안 받는 피해 50% 감소.', buff: { def: 0.5 } },
   grdElixir2: { name: '수호의 비약+', icon: 'elixirGrd', great: true, desc: '대성공! 다음 1회 전투 동안 받는 피해 75% 감소.', buff: { def: 0.75 } },
   shard:     { name: '검은 마력 조각', icon: 'shard', desc: '보랏빛으로 일렁이는 불길한 마력 결정.' },
-  mpPotion:  { name: 'MP 물약', icon: 'mp', desc: 'MP를 35% 회복해요.', heal: { mp: 30 }, price: 3 }
+  mpPotion:  { name: 'MP 물약', icon: 'mp', desc: 'MP를 30 또는 최대 MP의 35% 중 큰 만큼 회복해요.', heal: { mp: 30 }, price: 3 },
+  returnScroll: { name: '귀환 두루마리', icon: 'shard', warp: true, desc: '학교 밖에서 로비로 이동해요.', price: 8 }
 };
 const SHOP_LIST = ['hpPotion', 'mpPotion'];
+const scrollOpen = () => { const u = QM.get('under'); return !!(u && u.claimed) && player.lv >= 20; };   // 7장(학교 지하)을 끝내고 Lv.20이 되면 판다
+const shopList = () => SHOP_LIST.concat(scrollOpen() ? ['returnScroll'] : []);
 const USABLE = ['hpPotion', 'mpPotion', 'strElixir', 'strElixir2', 'grdElixir', 'grdElixir2'];   // 전투에서 쓸 수 있는 것
 const LOOT_OF = { slime: 'jelly', cookie: 'crumb', mandra: 'leaf' };
 const inventory = Array(25).fill(null);   // 칸마다 { id, n } — 같은 아이템은 한 칸에 겹쳐 쌓임
@@ -552,7 +555,7 @@ const errandCount = e => { const st = player.errands && player.errands[e.id]; re
 const errandGoal = e => Object.values(e.need).reduce((a, b) => a + b, 0);
 // 현장 의뢰: 각 던전에서 보스 전에 하나, 보스를 쓰러뜨린 뒤에 하나. 말을 걸지 않아도 그 사람이 먼저 부른다
 // pre(boss 있음) = 끝내야 보스와 싸울 수 있음 · post = 끝내야 교장선생님께 보고할 수 있음 · 다 잡으면 바로 보수를 준다
-const FT_WHO = { oat: () => ({ speaker: '상인 오트', portrait: OAT_PORTRAIT }), echo: () => ({ speaker: '사서 에코', portrait: LIBFACE }), vulca: () => ({ speaker: '탐험가 불카', portrait: VOLFACE }), terra: () => ({ speaker: '고고학자 테라', portrait: RUNFACE }) };
+const FT_WHO = { oat: () => ({ speaker: '상인 오트', portrait: OAT_PORTRAIT }), echo: () => ({ speaker: '사서 에코', portrait: LIBFACE }), vulca: () => ({ speaker: '탐험가 불카', portrait: VOLFACE }), terra: () => ({ speaker: '고고학자 테라', portrait: RUNFACE }), leon: () => ({ speaker: '레온', portrait: LEON_PORTRAIT }) };
 const FTASKS = [
   { id: 'f2a', q: 'forest', st: 'boss', map: 'forest', boss: 'warden', who: 'oat', title: '숲길 정리', need: { spikehog: 3, shroomy: 3 }, reward: { exp: 90, stones: 2, hp: 1 },
     offer: ['어이, 거기 학생! 잠깐만!', '워든에게 가기 전에 부탁 하나만 하세. 가시 고슴도치랑 독버섯 정령이 출장 가게 앞을 막고 있어서 장사를 못 하겠어.', '가시 고슴도치 3마리, 독버섯 정령 3마리만 혼내 주게. 풀숲에도 숨어 있다네!'],
@@ -562,7 +565,10 @@ const FTASKS = [
     done: ['숲이 한결 조용해졌어! 이제 교장선생님께 보고하러 가 보게.'] },
   { id: 'f3a', q: 'cave', st: 'boss', map: 'cave', boss: 'golem', who: 'oat', title: '야영지 지키기', need: { bunny: 3, bat: 3 }, reward: { exp: 140, stones: 2, hp: 1 },
     offer: ['으으, 추워라… 학생, 마침 잘 왔네!', '골렘이 깨어나면서 눈덩이 토끼랑 얼음 박쥐가 야영지까지 몰려오고 있어.', '골렘에게 가기 전에 눈덩이 토끼 3마리, 얼음 박쥐 3마리만 정리해 주게. 눈 더미에도 숨어 있다네!'],
-    done: ['휴, 이제 불 좀 쬘 수 있겠군. 받게, 보수야!', '프로스트 골렘은 동굴 안쪽에 있어. 대지 마법이 잘 듣는다더군!'] },
+    done: ['휴, 이제 불 좀 쬘 수 있겠군. 받게, 보수야!', '그런데… 저기 눈 더미 좀 보게. 내 보급 상자가 얼어붙어 있어.'] },
+  { id: 'f3c', q: 'cave', st: 'boss', map: 'cave', boss: 'golem', who: 'oat', title: '얼어붙은 보급 상자', need: { bat: 5, bunny: 2 }, reward: { exp: 130, stones: 2 },
+    offer: ['미안하지만 하나만 더 부탁하네! 상자 주변을 얼음 박쥐들이 맴돌아서 꺼낼 수가 없어.', '얼음 박쥐 5마리, 눈덩이 토끼 2마리만 쫓아 주게. 눈 더미를 밟으면 튀어나올 걸세!'],
+    done: ['됐다! 상자를 꺼냈어. 안에 든 건 비밀이지만… 마법석 몇 개 얹어 주지.', '프로스트 골렘은 동굴 안쪽에 있어. 대지 마법이 잘 듣는다더군!'] },
   { id: 'f3b', q: 'cave', st: 'report', map: 'cave', post: true, who: 'oat', title: '깨어난 얼음 몬스터', need: { bunny: 4, bat: 4 }, reward: { exp: 180, stones: 3, hp: 1, mp: 1 },
     offer: ['골렘이 쓰러지니 동굴이 녹기 시작했네! 그런데…', '얼음 속에 갇혀 있던 몬스터들이 깨어나 버렸어. 이대로 두면 학교까지 내려갈 거야.', '눈덩이 토끼 4마리, 얼음 박쥐 4마리만 더 부탁하네!'],
     done: ['자네 덕분에 동굴이 잠잠해졌어. 교장선생님께 어서 보고하게!'] },
@@ -571,25 +577,46 @@ const FTASKS = [
     done: ['고마워요! 이제 서가가 조용하네요.', '수호 영혼은 안쪽 방에 있어요. 대지 속성이라 불꽃 마법이 잘 통할 거예요.'] },
   { id: 'f4b', q: 'lib', st: 'report', map: 'library', post: true, who: 'echo', title: '서고 대청소', need: { dust: 4, bookworm: 3 }, reward: { exp: 210, stones: 3, hp: 1, mp: 1 },
     offer: ['수호 영혼이 잠들자 서고 곳곳에서 먼지 유령이 피어올랐어요…', '먼지 유령 4마리, 책벌레 3마리만 더 정리해 주실래요? 그래야 서고를 다시 열 수 있어요.'],
-    done: ['서고가 반짝반짝해졌어요! 교장선생님께 꼭 전해 주세요.'] },
+    done: ['서고가 반짝반짝해졌어요! …어라, 청소하다 찢어진 책장 조각이 나왔네요.', '교장선생님의 옛 일기 같은데, 떠다니는 책들이 나머지 조각을 물고 날아가 버렸어요!'] },
+  { id: 'f4c', q: 'lib', st: 'report', map: 'library', post: true, who: 'echo', title: '날아간 일기 조각', need: { flybook: 4, dust: 2 }, reward: { exp: 190, stones: 2, mp: 1 },
+    offer: ['일기 조각을 되찾아야 해요! 떠다니는 책 4마리, 먼지 유령 2마리를 쓰러뜨리면 떨어뜨릴 거예요.'],
+    done: ['찾았어요! 읽어 보니… "그 아이를 막지 못했다. 이름은 적지 않겠다" 라고 적혀 있네요.', '교장선생님께 꼭 전해 주세요. 어쩐지 중요한 이야기 같아요.'] },
   { id: 'f5a', q: 'volc', st: 'boss', map: 'volcano', boss: 'ignis', who: 'oat', title: '쏟아진 불 몬스터', need: { lizard: 3, spark: 3 }, reward: { exp: 180, stones: 2, hp: 1 },
     offer: ['학생! 방금 불카가 봉인 문 안으로 뛰어들어가는 걸 봤네!', '그런데 문이 열리면서 용암 도마뱀이랑 불똥 정령이 쏟아져 나왔어. 이대로 들어가면 앞뒤로 포위당할 걸세.', '용암 도마뱀 3마리, 불똥 정령 3마리부터 처리하게. 얼음 마법이 잘 들을 거야!'],
-    done: ['좋아, 길이 열렸네! 받게, 보수야.', '이제 화산의 심장으로! 불카를 부탁하네.'] },
+    done: ['좋아, 한숨 돌렸네! 받게, 보수야.', '…어? 내 짐수레 쪽이 왜 이렇게 환하지?'] },
+  { id: 'f5c', q: 'volc', st: 'boss', map: 'volcano', boss: 'ignis', who: 'oat', title: '불붙은 짐수레', need: { spark: 4, ashbat: 2 }, reward: { exp: 170, stones: 2 },
+    offer: ['큰일이야! 불똥 정령들이 내 짐수레에 불을 붙이려 해!', '불똥 정령 4마리, 잿빛 박쥐 2마리만 쫓아내 주게. 얼음 마법이 잘 들을 거야!'],
+    done: ['휴, 수레는 무사하군. 그런데 수레 밑에서 이런 게 나왔네.', '불카의 탐험 수첩인 것 같아. "불꽃 핵을 가져가면 이 산은…" 으음, 나머진 타 버렸군.'] },
+  { id: 'f5d', q: 'volc', st: 'boss', map: 'volcano', boss: 'ignis', who: 'oat', title: '심장으로 가는 길', need: { lizard: 4, ashbat: 3 }, reward: { exp: 190, stones: 2, hp: 1 },
+    offer: ['수첩에 적힌 길이 화산의 심장으로 이어지는데, 용암 도마뱀 무리가 막고 있어.', '용암 도마뱀 4마리, 잿빛 박쥐 3마리만 더 부탁하네. 이번이 정말 마지막이야!'],
+    done: ['좋아, 길이 열렸네! 이제 화산의 심장으로!', '불카를 부탁하네. 그 친구, 겉으론 철없어도 속은 나쁘지 않아.'] },
   { id: 'f5b', q: 'volc', st: 'report', map: 'volcano', post: true, who: 'vulca', title: '흩어진 불씨', need: { ashbat: 4, lizard: 3 }, reward: { exp: 240, stones: 3, hp: 1, mp: 1 },
     offer: ['…고마워. 네 덕분에 화산이 진정됐어.', '그런데 이그니스가 쓰러지며 흩어진 불씨에서 몬스터들이 계속 생겨나고 있어. 내가 벌인 일이니 끝까지 수습하고 싶어.', '잿빛 박쥐 4마리, 용암 도마뱀 3마리만 같이 정리해 줄래? 화산재 지대를 걸으면 튀어나와.'],
     done: ['정말 고마워. 이제 교장선생님께 가서 다 말씀드려. 내 잘못까지 전부.'] },
   { id: 'f6a', q: 'ruin', st: 'boss', map: 'ruins', boss: 'gaia', who: 'terra', title: '몰려드는 유적 몬스터', need: { mossgolem: 3, scorpion: 3 }, reward: { exp: 200, stones: 2, hp: 1 },
     offer: ['잠깐! 문이 열린 건 좋은데, 발판 소리에 유적 몬스터들이 몰려들고 있어.', '가이아와 싸우는 동안 뒤에서 덮치면 큰일이야. 이끼 골렘 3마리, 모래 전갈 3마리부터 정리하자.', '이끼 덤불 속에도 숨어 있으니 조심해!'],
-    done: ['좋아, 이제 안심이야. 이건 연구비… 아니, 보수야!', '가이아는 안쪽 방에 있어. 대지 속성이라 불꽃 마법이 잘 통할 거야.'] },
+    done: ['좋아, 한숨 돌렸어. 이건 연구비… 아니, 보수야!', '그런데 발판 아래에서 이상한 마력이 새어 나오고 있어. 잠깐만 더 도와줘.'] },
+  { id: 'f6c', q: 'ruin', st: 'boss', map: 'ruins', boss: 'gaia', who: 'terra', title: '새어 나오는 마력', need: { scorpion: 4, turtle: 2 }, reward: { exp: 210, stones: 2 },
+    offer: ['발판 아래 마력에 홀린 모래 전갈 4마리, 수정 거북 2마리가 날뛰고 있어. 진정시켜 줘!', '이끼 덤불 근처를 걸으면 튀어나올 거야.'],
+    done: ['역시… 마력의 정체는 "깊은 곳의 문"이야. 가이아도 그 문을 지키고 있던 걸지 몰라.', '가이아는 안쪽 방에 있어. 대지 속성이라 불꽃 마법이 잘 통할 거야.'] },
   { id: 'f6b', q: 'ruin', st: 'report', map: 'ruins', post: true, who: 'terra', title: '물길의 수정 거북', need: { turtle: 4, mossgolem: 3 }, reward: { exp: 270, stones: 3, hp: 1, mp: 1 },
     offer: ['가이아가 다시 잠들었어. 유적이 조용해졌…지 않네?', '수정 거북들이 물길에서 올라오고 이끼 골렘도 남아 있어. 연구를 계속하려면 정리가 필요해.', '수정 거북 4마리, 이끼 골렘 3마리만 부탁할게!'],
-    done: ['고마워! 이제 마음 놓고 연구할 수 있겠어. 교장선생님께 안부 전해 줘.'] },
+    done: ['고마워! 물길이 한결 조용해졌어. …어? 그런데 석판 하나가 안 보이네.', '이끼 골렘들이 안고 도망친 것 같아. 잠깐만 더 부탁해도 될까?'] },
+  { id: 'f6d', q: 'ruin', st: 'report', map: 'ruins', post: true, who: 'terra', title: '사라진 석판', need: { mossgolem: 4, scorpion: 2 }, reward: { exp: 260, stones: 3, mp: 1 },
+    offer: ['이끼 골렘 4마리, 모래 전갈 2마리를 쓰러뜨리면 석판을 되찾을 수 있을 거야.'],
+    done: ['찾았다! 석판에는 이렇게 적혀 있어. "문이 열리면 어둠의 학자가 돌아온다."', '…불길한 말이야. 교장선생님께 꼭 전해 줘.'] },
   { id: 'f7a', q: 'under', st: 'boss', map: 'under', boss: 'knight', who: 'oat', title: '야영지 습격', need: { rat: 3, armor: 3 }, reward: { exp: 230, stones: 2, hp: 2 },
     offer: ['학생, 여기까지 내려왔나! 나도 출장 왔네, 허허.', '봉인 문이 열리자 그림자 쥐랑 유령 갑옷이 몰려나와서 야영지가 위험해.', '어둠의 기사에게 가기 전에 그림자 쥐 3마리, 유령 갑옷 3마리만 처리해 주게.'],
     done: ['살았네! 받게, 보수야. 기사는 강하니 물약을 넉넉히 챙기게.'] },
   { id: 'f7b', q: 'under', st: 'report', map: 'under', post: true, who: 'oat', title: '퍼진 그림자', need: { rat: 4, armor: 4 }, reward: { exp: 300, stones: 3, hp: 1, mp: 1 },
     offer: ['레온을 구했다고? 장하구먼!', '그런데 기사가 쓰러지면서 지하에 그림자 기운이 퍼졌어. 남은 몬스터들이 날뛰고 있네.', '그림자 쥐 4마리, 유령 갑옷 4마리만 더 부탁하네. 거미줄 잔해 쪽을 살펴보게!'],
-    done: ['고맙네! 이제 교장선생님께 가 보게. 큰 소식이 기다리고 있을 걸세.'] },
+    done: ['고맙네! …그런데 레온 그 친구가 자네를 찾던데? 할 말이 있나 보더군.'] },
+  { id: 'f7c', q: 'under', st: 'report', map: 'under', post: true, who: 'leon', title: '레온의 부탁', need: { armor: 5, rat: 2 }, reward: { exp: 280, stones: 2, hp: 1 },
+    offer: ['…야. 구해 줘서 고마워. 한 번만 말할 거니까 잘 들어.', '결계 안에서 봤어. 어둠의 기사가 문 너머로 누군가를 부르고 있었어. 지하 통로에 퍼진 문양 때문일 거야.', '유령 갑옷 5마리, 그림자 쥐 2마리를 같이 정리하자. 문양을 지키고 있는 녀석들이야.'],
+    done: ['흥, 나쁘지 않네. …사실 나, 얼마 전 이름 없는 편지를 받았어. 지하로 오라는.', '교장선생님껜 아직 비밀이야. 하나만 더 도와줘.'] },
+  { id: 'f7d', q: 'under', st: 'report', map: 'under', post: true, who: 'leon', title: '지하의 문양', need: { rat: 4, armor: 4 }, reward: { exp: 310, stones: 3, hp: 1, mp: 1 },
+    offer: ['문양이 학교 밑 전체로 퍼지고 있어. 더 번지기 전에 막아야 해.', '그림자 쥐 4마리, 유령 갑옷 4마리. 이번엔 내가 옆에서 지켜볼게.'],
+    done: ['…고마워. 이제 교장선생님께 가자. 큰 이야기를 해야 해.', '편지 얘기도 이제 숨기지 않을게.'] },
 ];
 const ftState = t => (player.ftask || {})[t.id];
 const ftActive = t => { const st = ftState(t); return !!(st && st.state === 'active'); };
@@ -848,6 +875,7 @@ function drawItemIcon(c, id, cx, cy, size) {
   if (!drawArt(c, it.icon, cx - r[2] * k / 2, cy - r[3] * k / 2, r[2] * k, r[3] * k) && id === 'manaStone') drawStone(c, cx, cy, size / 26);
 }
 function drawNPC(c, n, t) {
+  if (n.id === 'corrExit') return;               // 시련의 복도 입구 마법진 (바닥에 따로 그림)
   if (n.id === 'leon' || n.id === 'leon2') {
     const s = c3Art('leon'); if (!s) return;
     c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(n.x, n.y + 16, 16, 5, 0, 0, Math.PI * 2); c.fill();
@@ -1309,6 +1337,18 @@ function syncQuestBoss(mapId, qid, type, tx, ty) {
   }
 })();
 function spawnMobs(m) { m.mobs = (m.mobDefs || []).map(d => ({ gold: false, type: d.type, sx: d.x, sy: d.y, x: (d.x + 0.5) * T, y: (d.y + 0.5) * T, vx: 0, vy: 0, t: Math.random() * 2, anim: Math.random() * 3, alive: true, flip: false })); }
+
+
+// ---------------- 시련의 복도: 보스 앞 장애물 길 (1~3단계). 맞으면 최대 체력의 절반, 물약 금지, 쓰러지면 기숙사
+const CORR = { warden: 1, golem: 1, librarian: 2, ignis: 2, gaia: 3, knight: 3, azka: 4 };
+const CORR_SPEC = { 1: { len: 30, gap: 0.85, v: 200, big: 0 }, 2: { len: 36, gap: 0.65, v: 250, big: 0.2 }, 3: { len: 42, gap: 0.5, v: 300, big: 0.3 }, 4: { len: 46, gap: 0.42, v: 330, big: 0.35 } };
+const CORR_H = 11, CORR_SAFE = 4;                                   // 복도 높이(칸), 출발 안전지대 끝(칸)
+function buildCorr(lv, bossType, theme) {
+  const S = CORR_SPEC[lv], w = CORR_SAFE + S.len + 4, g = grid(w, CORR_H); border(g, 2);
+  return { id: 'corr', name: `시련의 복도 · ${lv}단계`, theme, w, h: CORR_H, g, start: { x: 2.5, y: 6.3 }, stones: 0, npcs: [{ id: 'corrExit', name: '입구 마법진', x: 2.5 * T, y: 6.1 * T, half: 30 }], portals: {}, labels: [], signs: [], items: [], mobs: [], mobDefs: [],
+    tint: 'rgba(30,10,50,.18)', corr: { lv, boss: bossType, endX: (w - 3) * T, obs: [], warn: [], nextT: 1.2, back: null } };
+}
+MAPS.corr = buildCorr(1, 'warden', 'cave');
 
 // 마법석을 각 맵의 빈 바닥에 무작위로 배치
 function spawnStones(m) {
@@ -1879,7 +1919,7 @@ function drawInventory(c, t, sel) {
     textFit(c, sp ? `${SPIRITS[sp.kind].name} Lv.${sp.lv} · 친밀도 ${sp.aff}/${SP_NEED} · 전리품을 먹이거나 함께 싸우면 올라요` : `${n} / 25 칸 사용 중 · 아이템을 누르면 설명이 나와요`, PANEL.x + 24, by + 10, PANEL.w - 48, 14, '#c9b48a', null, 0, 'left');
   }
   const sst = sel >= 0 ? inventory[sel] : null;
-  if (sst && (ITEMS[sst.id].heal || ITEMS[sst.id].buff || (ITEMS[sst.id].loot && player.spirit))) {
+  if (sst && (ITEMS[sst.id].heal || ITEMS[sst.id].buff || ITEMS[sst.id].warp || (ITEMS[sst.id].loot && player.spirit))) {
     const label = ITEMS[sst.id].loot ? '먹이' : '사용';
     const ub = useBtn(), h = inside(mouse, ub); if (h) hov = true;
     c.fillStyle = h ? '#4caf50' : '#3f8a3a'; rr(c, ub.x, ub.y, ub.w, ub.h, 10); c.fill();
@@ -1889,8 +1929,9 @@ function drawInventory(c, t, sel) {
   return hov || hi >= 0;
 }
 // 상점 창: 마법석으로 물약 사기
-const shopRows = () => SHOP_LIST.concat(COS[player.hero] && !player.robeOwned ? ['robe'] : []).map((id, i) => ({ id, x: PANEL.x + 24, y: PANEL.y + 116 + i * 96, w: PANEL.w - 48, h: 84,
-  buy: { x: PANEL.x + PANEL.w - 112, y: PANEL.y + 116 + i * 96 + 24, w: 76, h: 36 } }));
+const shopRows = () => { const L = shopList().concat(COS[player.hero] && !player.robeOwned ? ['robe'] : []), sp = L.length > 3 ? 80 : 96, h = L.length > 3 ? 74 : 84;
+  return L.map((id, i) => ({ id, x: PANEL.x + 24, y: PANEL.y + 112 + i * sp, w: PANEL.w - 48, h,
+    buy: { x: PANEL.x + PANEL.w - 112, y: PANEL.y + 112 + i * sp + (h - 36) / 2, w: 76, h: 36 } })); };
 function drawShop(c, t) {
   let hov = drawPanelFrame(c, '오트의 물약 가게');
   c.fillStyle = 'rgba(28,14,5,.6)'; rr(c, PANEL.x + 24, PANEL.y + 64, PANEL.w - 48, 38, 8); c.fill();
@@ -1920,7 +1961,7 @@ const QUIZ = [   // o[0]이 정답
   { q: '불꽃 속성이 약한 상대는?', o: ['얼음', '대지', '불꽃'] },
   { q: '얼음 속성이 약한 상대는?', o: ['대지', '불꽃', '얼음'] },
   { q: '대지 속성이 약한 상대는?', o: ['불꽃', '얼음', '대지'] },
-  { q: '오트의 가게에서 물약 한 병의 값은?', o: ['마법석 1개', '마법석 2개', '마법석 3개'] },
+  { q: '오트의 가게에서 물약 한 병의 값은?', o: ['마법석 3개', '마법석 1개', '마법석 2개'] },
   { q: '기숙사 침대에서 쉬면 어떻게 될까?', o: ['HP·MP 완전 회복', 'MP만 회복', '아무 일도 없음'] }
 ];
 const quizRows = () => [0, 1, 2].map(i => ({ i, x: PANEL.x + 40, y: PANEL.y + 190 + i * 62, w: PANEL.w - 80, h: 50 }));
@@ -2456,7 +2497,7 @@ function saveGame() {
   if (Game.state !== Field || !Field.map) return;
   const d = { v: 1, hero: player.hero, el: player.element.key, gender: player.gender, lv: player.lv, hp: player.hp, maxHp: player.maxHp,
     mp: player.mp, maxMp: player.maxMp, exp: player.exp, nextExp: player.nextExp, inv: inventory.slice(), quests: QM.list, curve: 3, spirit: player.spirit || null, spBox: player.spBox || {}, mastery: player.mastery || {}, egg: player.egg || null, errands: player.errands || {}, ftask: player.ftask || {}, bossLoss: player.bossLoss || {}, off: player.off || {}, slots: player.slots || [], seen: player.seen || [], trialFails: player.trialFails || {}, trialSeen: !!player.trialSeen, tips: player.tips || {}, kills: player.kills || {}, best: player.best || 0, playSec: Math.round(player.playSec || 0), robeOwned: !!player.robeOwned, robeOn: !!player.robeOn, codexDone: !!Field.codexDone, metOat: !!Field.metOat, oatSorry: !!Field.oatSorry, quizDay: Field.quizDay || '', streak: player.streak, buffs: player.buffs,
-    map: Field.map.id, x: player.x / T, y: player.y / T,
+    ...(Field.map.corr ? (Field.map.corr.back ? { map: Field.map.corr.back.map, x: Field.map.corr.back.x / T, y: Field.map.corr.back.y / T } : { map: 'hall', x: 20, y: 15 }) : { map: Field.map.id, x: player.x / T, y: player.y / T }),
     stones: Object.fromEntries(Object.values(MAPS).map(m => [m.id, (m.items || []).map(i => [i.x, i.y])])) };
   try { localStorage.setItem(slotKey(SLOT), JSON.stringify(d)); } catch (_) {}
   Net.mark();
@@ -2848,6 +2889,8 @@ const Field = {
         player.moving = false;
         const ft = b.boss && FTASKS.find(x => x.boss === b.type && ftActive(x));
         if (ft) { this.invuln = 1.6; joyRelease(); this.say(`먼저 현장 의뢰 「${ft.title}」부터 끝내자 (${ftText(ft)})`); continue; }
+        const cl = b.boss && CORR[b.type];
+        if (cl && !((player.tips || {}).corrDone || {})[b.type]) { this.invuln = 1.6; joyRelease(); this.corrAsk(b, cl); continue; }
         const pre = BOSS_PRE[b.type];
         if (pre && !b.talked) {   // 보스: 싸우기 전에 한마디
           b.talked = true; joyRelease();
@@ -2855,6 +2898,74 @@ const Field = {
           this.startPage();
         } else this.swirl = { t: 0, mob: b };
       }
+    }
+  },
+  corrAsk(b, lv) {                                 // 보스 앞: 시련의 복도 안내
+    const tp = player.tips = player.tips || {}, first = !tp.corr; tp.corr = 1;
+    const lines = first ? ['보스의 방으로 가는 길목에 오래된 시련의 문이 서 있다.', '문에 글귀가 새겨져 있다. 「시련의 복도를 통과한 자만 지나갈 수 있다. 장애물에 맞으면 최대 체력의 절반을 잃고, 물약과 두루마리는 쓸 수 없다. 쓰러지면 기숙사로 돌아간다.」', '체력은 지금 그대로 들어간다. 체력이 절반 이하라면 한 번만 맞아도 쓰러지니 미리 회복해 두자.', '들어서면 안전지대가 있고, 입구 마법진 위에서 대화 버튼을 누르면 언제든 들어오기 전 자리로 나갈 수 있다.', '출발선을 넘으면 앞에서 장애물이 계속 굴러온다. 경고 표시를 보고 피하면서 끝의 문까지 달려가자! 맞으면 출발선으로 돌아간다.']
+      : [`시련의 문이다. 이번에는 ${lv}단계. 복도를 통과해야 보스에게 갈 수 있다.`, `지금 HP ${player.hp}/${player.maxHp}. 맞으면 ${Math.ceil(player.maxHp / 2)}씩 깎인다.`];
+    this.dialog = { speaker: '시련의 문', icon: ICON[b.type], i: 0, lines, onEnd: () => {
+      const dx = player.x - b.x, dy = player.y - b.y, d0 = Math.hypot(dx, dy) || 1; let bx = player.x, by = player.y;
+      for (const d of [120, 95, 70]) { const nx = b.x + dx / d0 * d, ny = b.y + dy / d0 * d; if (this.mobFree(nx, ny)) { bx = nx; by = ny; break; } }
+      const back = { map: this.map.id, x: bx, y: by }, theme = this.map.theme;
+      fadeTo(() => { MAPS.corr = buildCorr(lv, b.type, theme); MAPS.corr.corr.back = back; this.corrBusy = false;
+        Game.set('field', { map: 'corr' }); Field.invuln = 1.5; Field.say(`시련의 복도 ${lv}단계! 준비되면 출발! (마법진 위에서 대화 버튼을 누르면 나갈 수 있다)`); }); } };
+    this.startPage();
+  },
+  corrLeave() {                                   // 입구 마법진 위에서 버튼: 시련을 멈추고 들어오기 전 자리로
+    const C = this.map.corr; this.corrBusy = true; joyRelease(); Sound.sfx('portal');
+    fadeTo(() => { const b = C.back; this.corrBusy = false;
+      Game.set('field', { map: b.map, x: b.x / T, y: b.y / T }); Field.invuln = 2.5; Field.say('시련의 복도에서 나왔다. 준비되면 다시 도전하자'); saveGame(); });
+  },
+  corrTick(dt) {
+    const m = this.map, C = m.corr, S = CORR_SPEC[C.lv]; if (this.dialog || this.panel || fader.phase || this.swirl || this.corrBusy) return;
+    if (player.x > C.endX) {
+      this.corrBusy = true; joyRelease(); Sound.sfx('fanfare');
+      fadeTo(() => { const tp = player.tips = player.tips || {}; tp.corrDone = tp.corrDone || {}; tp.corrDone[C.boss] = 1;
+        Game.set('field', { map: C.back.map, x: C.back.x / T, y: C.back.y / T }); Field.invuln = 3.5; Field.say('시련 통과! 물약으로 체력을 채우고 보스에게 가자'); saveGame(); });
+      return;
+    }
+    const run = player.x > CORR_SAFE * T && player.x < C.endX - 7 * T;       // 출발선을 넘으면 장애물이 계속 나온다
+    if (run) { C.nextT -= dt; if (C.nextT <= 0) { C.nextT = S.gap * (0.75 + 0.5 * Math.random()); C.warn.push({ row: 2 + Math.floor(Math.random() * 8), t: 0.75, big: Math.random() < S.big, v: S.v * (0.9 + 0.2 * Math.random()) }); } }
+    for (const w of C.warn) w.t -= dt;
+    for (const w of C.warn) if (w.t <= 0) C.obs.push({ x: player.x + W / 2 + 70, y: (w.row + 0.5) * T, v: w.v, big: w.big, ph: Math.random() * 6 });
+    C.warn = C.warn.filter(w => w.t > 0);
+    for (const o of C.obs) o.x -= o.v * dt;
+    C.obs = C.obs.filter(o => o.x > 0);
+    if (this.invuln > 0 || player.x < CORR_SAFE * T) return;
+    const py = player.y - 6; let hit = false;
+    for (const o of C.obs) { const rx = (o.big ? 32 : 19) + 9, ry = (o.big ? 52 : 19) + 9; if (((o.x - player.x) / rx) ** 2 + ((o.y + (o.big ? 0 : 0) - py) / ry) ** 2 < 1) hit = true; }
+    if (!hit) return;
+    Sound.sfx('hurt'); player.hp -= Math.ceil(player.maxHp / 2);
+    if (player.hp <= 0) {
+      player.hp = 0; this.corrBusy = true; joyRelease(); Sound.sfx('lose');
+      fadeTo(() => { player.hp = player.maxHp; player.mp = player.maxMp; player.streak = 0; this.corrBusy = false; Game.set('field', { map: 'dorm', x: 5, y: 5.5 }); Field.invuln = 2; Field.say('시련에 실패했다… 기숙사에서 정신을 차렸다 (HP·MP 회복)'); });
+    } else { player.x = m.start.x * T; player.y = m.start.y * T; C.obs = []; C.warn = []; C.nextT = 1.2; this.invuln = 1.6; joyRelease(); this.say('맞았다! 최대 체력의 절반이 깎였다. 출발선으로 돌아간다'); }
+  },
+  corrDraw(c, t) {
+    const m = this.map, C = m.corr, camX = Math.round(this.cam.x);
+    c.fillStyle = 'rgba(120,255,170,.13)'; c.fillRect(T, 2 * T, (CORR_SAFE - 1) * T, 8 * T);          // 출발 안전지대
+    c.fillStyle = 'rgba(255,230,140,.55)'; c.fillRect(CORR_SAFE * T - 2, 2 * T, 4, 8 * T);
+    drawLabel(c, 2.5 * T, 2.7 * T, '안전지대');
+    const bossDoor = (bx, by) => { const bt = C.boss; if (bt === 'librarian') libDraw(c, 'doorOpen', bx, by, 2.4 * T); else if (bt === 'ignis') volDraw(c, 'gateOpen', bx, by, 2.5 * T); else if (bt === 'gaia') ruDraw(c, 'doorOpen', bx, by, 2.4 * T); else drawC4(c, 'door1', bx, by, 2.5 * T); };
+    { const cx = 2.5 * T, cy = 6.1 * T, g = c.createRadialGradient(cx, cy, 6, cx, cy, 64); g.addColorStop(0, 'rgba(255,235,160,.35)'); g.addColorStop(1, 'rgba(255,235,160,0)');   // 입구 마법진: 위에서 버튼을 누르면 밖으로
+      c.fillStyle = g; c.fillRect(cx - 70, cy - 70, 140, 140); drawMagicCircle(c, cx, cy, t); }
+    { const ex = C.endX, bx = ex + 2 * T, by = 7.3 * T, bt = C.boss;                           // 출구: 게임 속 보스 문 그림을 그대로 사용
+      const g = c.createLinearGradient(ex, 0, ex + 2.5 * T, 0); g.addColorStop(0, 'rgba(160,255,200,0)'); g.addColorStop(1, `rgba(160,255,200,${0.3 + 0.08 * Math.sin(t * 4)})`); c.fillStyle = g; c.fillRect(ex, 2 * T, 2.5 * T, 8 * T);
+      bossDoor(bx, by);
+      drawLabel(c, bx, by - 3.3 * T, '출구'); }
+    for (const w of C.warn) {                      // 곧 날아올 줄: 화면 오른쪽 끝에 경고
+      const x = camX + W - 34, y = (w.row + 0.5) * T, a = 0.5 + 0.5 * Math.sin(t * 25);
+      c.fillStyle = `rgba(255,70,50,${0.12 + 0.12 * a})`; c.fillRect(camX, (w.row - (w.big ? 0.4 : 0)) * T, W, T * (w.big ? 2 : 1));
+      c.fillStyle = `rgba(255,70,50,${0.6 + 0.4 * a})`; c.beginPath(); c.moveTo(x + 14, y - 14); c.lineTo(x - 12, y); c.lineTo(x + 14, y + 14); c.fill();
+    }
+    for (const o of C.obs) {
+      c.save(); c.translate(o.x, o.y); const R = o.big ? 34 : 20;
+      c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(0, R * 0.8, R * 0.8, 6, 0, 0, 6.28); c.fill();
+      if (o.big) c.scale(1, 1.5);
+      c.rotate(-(t * 8 + o.ph)); c.fillStyle = '#d9d9e8'; c.strokeStyle = '#3a3050'; c.lineWidth = 2; c.beginPath();
+      for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8, r = i % 2 ? R * 0.7 : R; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#8a3a4a'; c.beginPath(); c.arc(0, 0, R * 0.33, 0, 6.28); c.fill(); c.restore();
     }
   },
   camTarget() {
@@ -2914,6 +3025,17 @@ const Field = {
     const wasDone = this.panel === 'questDone';
     this.panel = this.panel === id ? null : id; this.confirmReset = false; this.invSel = -1;
     if (wasDone && this.panel !== 'questDone') this.questTeaser();
+  },
+  scrollNews() {                                 // 귀환 두루마리를 처음 팔 때 오트가 알려 줌
+    const tp = player.tips = player.tips || {}; if (!scrollOpen() || tp.scroll) return [];
+    tp.scroll = 1; return ['오, 마침 잘 왔네! 새 물건을 들여놨다네. 귀환 두루마리일세.', '학교 밖 먼 곳에서 쓰면 곧바로 로비로 돌아올 수 있지. 마법석 8개라 값이 좀 나가지만 다리품 값은 하네!', '탑이나 학교 안에서는 못 쓰니 조심하게나.'];
+  },
+  useScroll() {                                  // 귀환 두루마리: 학교 밖 어디서든 로비로
+    const id = this.map.id;
+    if (['hall', 'shop', 'office', 'dorm'].includes(id) || /^tower/.test(id) || this.trial) { this.say('여기서는 쓸 수 없어요. 학교 밖 먼 곳에서 쓰는 두루마리예요'); return; }
+    if (!takeItem('returnScroll')) return;
+    this.invSel = -1; this.panel = null; joyRelease(); Sound.sfx('portal'); saveGame();
+    fadeTo(() => { Game.set('field', { map: 'hall', x: 20, y: 15 }); Field.invuln = 1.5; Field.say('귀환 두루마리의 빛과 함께 학교 로비로 돌아왔다!'); saveGame(); });
   },
   startRematch(type) {
     this.panel = null;
@@ -3173,7 +3295,8 @@ const Field = {
     return errandCount(e) >= errandGoal(e) ? ' · 심부름 완료! 보고하러 가자' : ` · 심부름 ${errandCount(e)}/${errandGoal(e)}`;
   },
   talk(n) {
-    if (n.id === 'principal') { const ft = FTASKS.find(x => x.post && ftActive(x)); if (ft) { this.dialog = { speaker: NAMES.principal, portrait: PORTRAIT, i: 0, lines: [`보고는 반갑다만, ${FT_WHO[ft.who]().speaker}의 부탁이 남았다고 들었다. 「${ft.title}」`, `지금까지: ${ftText(ft)}. 맡은 일은 끝까지 해내고 오거라.`] }; this.startPage(); return; } }
+    if (n.id === 'corrExit') { this.corrLeave(); return; }
+    if (n.id === 'principal') { const ft = FTASKS.find(x => x.post && (ftActive(x) || (!ftState(x) && (QM.get(x.q) || {}).stage === 'report'))); if (ft) { this.dialog = { speaker: NAMES.principal, portrait: PORTRAIT, i: 0, lines: ftActive(ft) ? [`보고는 반갑다만, ${FT_WHO[ft.who]().speaker}의 부탁이 남았다고 들었다. 「${ft.title}」`, `지금까지: ${ftText(ft)}. 맡은 일은 끝까지 해내고 오거라.`] : [`보고는 나중에 받으마. 먼저 ${FT_WHO[ft.who]().speaker}에게 들러 보거라.`, '일을 마치고 오면 그때 천천히 듣겠다.'] }; this.startPage(); return; } }
     if (this.errandTalk(n)) return;
     if (/^lever\d$/.test(n.id)) {
       const q = QM.get('lib'), i = +n.id.slice(5);
@@ -3356,7 +3479,7 @@ const Field = {
     if (n.id === 'oat2') {
       const cv = QM.get('cave'), boss = cv && (cv.stage === 'braziers' || cv.stage === 'boss');
       const lines = boss ? ['보스는 한 번에 쓰러지지 않는다네. 물약을 넉넉히 챙겨 가게!', '큰 공격이 오기 전에 피를 채워 두는 게 요령일세.'] : ['야영지까지 출장을 왔다네! 물약이 필요하면 말하게나.'];
-      this.dialog = { speaker: n.name, lines: lines.concat(this.errandRecap('oat')), i: 0, portrait: OAT_PORTRAIT, onEnd: () => this.togglePanel('shop') };
+      this.dialog = { speaker: n.name, lines: lines.concat(this.scrollNews(), this.errandRecap('oat')), i: 0, portrait: OAT_PORTRAIT, onEnd: () => this.togglePanel('shop') };
       this.startPage(); return;
     }
     if (n.id === 'camp') {
@@ -3372,7 +3495,7 @@ const Field = {
     }
     if (n.id === 'merchant') {
       const lines = this.metOat
-        ? ['어서 오게! 오늘은 무엇을 찾나?', ...this.errandRecap('oat')]
+        ? ['어서 오게! 오늘은 무엇을 찾나?', ...this.scrollNews(), ...this.errandRecap('oat')]
         : ['어서 오게, 젊은 마법사! 오트의 물약 가게일세.', '마법석을 가져오면 물약과 바꿔 주지. 물약 하나에 마법석 세 개일세.'];
       this.dialog = { speaker: n.name, lines, i: 0, portrait: OAT_PORTRAIT, onEnd: () => { this.metOat = true; this.togglePanel('shop'); } };
       this.startPage(); return;
@@ -3385,7 +3508,7 @@ const Field = {
                  '기숙사에서 푹 쉬고 오너라. 그다음엔 오트의 가게에서 HP 물약을 하나 사 보고, 정원의 슬라임을 마법으로 쓰러뜨려 보거라.', '물약값으로 마법석 세 개를 주마. 다 해 보면 나에게 돌아오거라.'];
         onEnd = () => { QM.accept({ id: 'intro', title: '입학 안내', goal: 1, stage: 'rest', giver: NAMES.principal }); addItem('manaStone', 3); this.say('새 퀘스트를 받았다: 입학 안내 (마법석 3개)'); saveGame(); };
       } else if (iq.stage !== 'report') {
-        lines = { rest: ['먼저 기숙사로 가서 침대에서 쉬고 오너라.', '침대 가까이 가서 Space(폰은 휴식 버튼)를 누르면 된단다.'], buy: ['오트의 가게는 로비 왼쪽 위에 있단다.', 'HP 물약을 하나 사 오너라. 마법석 한 개면 된단다.'],
+        lines = { rest: ['먼저 기숙사로 가서 침대에서 쉬고 오너라.', '침대 가까이 가서 Space(폰은 휴식 버튼)를 누르면 된단다.'], buy: ['오트의 가게는 로비 왼쪽 위에 있단다.', 'HP 물약을 하나 사 오너라. 마법석 세 개면 된단다.'],
                   magic: ['정원에서 슬라임과 싸울 때 화면 오른쪽 아래의 마법 버튼을 눌러 쓰거라.', 'MP가 허락하는 만큼 마법을 쓰는 게 기본기란다.'], potion: ['이제 물약을 한 번 써 보거라.', '인벤토리에서 물약을 누르거나, 전투 중 \'아이템\'을 고르면 된단다.'] }[iq.stage] || ['어서 가 보거라.'];
       } else {
         lines = ['안내를 모두 마쳤구나! 이제 정식 시험이다.', '요즘 정원에 슬라임들이 불어나 소란을 피우고 있단다.', '정원의 슬라임 3마리를 처치하고 오거라. 다치면 기숙사에서 쉬는 것도 잊지 말거라.'];
@@ -3480,7 +3603,7 @@ const Field = {
           } else {
             const uq = QM.get('under'), lq = QM.get('lib'), vq = QM.get('volc'), rq = QM.get('ruin');
             if (!lq && !uq) {
-              lines = ['동굴의 일을 잘 마쳤구나. 그런데 교장실에 오래 보관하던 내 옛 일기장이 사라졌단다.', '로비 왼쪽 아래에 서고로 내려가는 계단을 열어 두마. 사서 에코에게 먼저 말을 걸어 보거라.'];
+              lines = ['동굴의 일을 잘 마쳤구나. 그런데 교장실에 오래 보관하던 내 옛 일기장이 사라졌단다.', '로비 왼쪽 아래에 서고로 내려가는 계단을 열어 두마. 사서 에코에게 먼저 말을 걸어 보거라.', '그리고 서고부터는 몬스터가 둘이서 함께 덤빌 때가 있단다. 싸울 상대는 직접 눌러서 고를 수 있으니, 약한 놈이나 상성이 맞는 놈부터 노려 보거라.'];
               onEnd = () => { QM.accept({ id: 'lib', title: '서고의 비밀', goal: 1, stage: 'echo', giver: NAMES.principal }); syncBoss(); this.say('새 퀘스트를 받았다: 서고의 비밀 (로비 왼쪽 아래에 계단이 열렸다)'); saveGame(); };
             } else if (lq && lq.stage !== 'done' && (lq.stage === 'report' || !uq)) {
               if (lq.stage === 'report') {
@@ -3546,7 +3669,7 @@ const Field = {
                 addItem('manaStone', 10); addItem('hpPotion', 2); addItem('mpPotion', 2);
                 if (up) this.lvFx = 2.2;
                 this.questDone = { title: '학교 지하 통로', rewards: ['경험치 720' + (up ? ` · 레벨 업! Lv.${player.lv}${newSpellText(before)}` : ''), '마법석 10개', 'HP 물약 2개 · MP 물약 2개'],
-                  teaser: ['레온도 많이 놀랐을 게다. 겉으로는 툴툴대도 너에게 고마워하고 있단다.', `어둠의 기사는 옛날 ${NAMES.demonLord}의 군단에서 문을 지키던 기사였다고 전해진단다.`,
+                  teaser: ['레온도 많이 놀랐을 게다. 겉으로는 툴툴대도 너에게 고마워하고 있단다.', '참, 오트가 먼 곳에서도 금방 돌아올 수 있게 귀환 두루마리를 팔기 시작했단다. (Lv.20부터) 학교 밖에서 쓰면 로비로 순간이동한단다.', `어둠의 기사는 옛날 ${NAMES.demonLord}의 군단에서 문을 지키던 기사였다고 전해진단다.`,
                            '지하 통로 끝의 문양을 보니 봉인이 깨지기 직전이구나… 다음엔 더 큰 싸움이 기다리고 있을 게다.'] };
                 this.panel = 'questDone'; saveGame();
               };
@@ -3568,7 +3691,7 @@ const Field = {
                 onEnd = () => { QM.accept({ id: 'volc', title: '불의 산', goal: 1, stage: 'meet', giver: NAMES.principal }); syncBoss(); this.say('새 퀘스트를 받았다: 불의 산 (어둠의 숲 서쪽 끝에 화산 길이 열렸다)'); saveGame(); };
               }
               else if (!lq) {
-                lines = ['아참, 교장실에 오래 보관하던 내 옛 일기장이 사라졌단다.', '로비 왼쪽 아래에 서고로 내려가는 계단을 열어 두마. 사서 에코에게 먼저 말을 걸어 보거라. 서고 깊은 곳에는 새로운 정령이 잠들어 있다는구나.'];
+                lines = ['아참, 교장실에 오래 보관하던 내 옛 일기장이 사라졌단다.', '로비 왼쪽 아래에 서고로 내려가는 계단을 열어 두마. 사서 에코에게 먼저 말을 걸어 보거라. 서고 깊은 곳에는 새로운 정령이 잠들어 있다는구나.', '그리고 서고부터는 몬스터가 둘이서 함께 덤빌 때가 있단다. 싸울 상대는 직접 눌러서 고를 수 있으니, 약한 놈이나 상성이 맞는 놈부터 노려 보거라.'];
                 onEnd = () => { QM.accept({ id: 'lib', title: '서고의 비밀', goal: 1, stage: 'echo', giver: NAMES.principal }); syncBoss(); this.say('새 퀘스트를 받았다: 서고의 비밀 (로비 왼쪽 아래에 계단이 열렸다)'); saveGame(); };
               }
               else lines = ['네가 아르피아의 자랑이다. 언제든 놀러 오거라.', '학교는 이제 평화롭단다. 마음껏 수련하거라!'];
@@ -3709,6 +3832,7 @@ const Field = {
       else if (p) fadeTo(() => this.load(p.to, p.x, p.y));
     }
     this.updateMobs(dt);
+    if (m.corr) this.corrTick(dt);
     this.near = null;
     for (const n of m.npcs) if (Math.hypot(n.x - player.x, n.y - player.y) <= 50) this.near = n;
     this.nearBed = !this.near && (this.tileAt(player.x, player.y - T * 0.75) === 'b' || this.tileAt(player.x - T * 0.75, player.y) === 'b' || this.tileAt(player.x + T * 0.75, player.y) === 'b');
@@ -3744,6 +3868,8 @@ const Field = {
       for (let i = 0; i < 25; i++) if (inside({ x, y }, slotRect(i))) { this.invSel = this.invSel === i ? -1 : i; return; }
       const sst = this.invSel >= 0 ? inventory[this.invSel] : null;
       if (sst && ITEMS[sst.id].loot && player.spirit && inside({ x, y }, useBtn())) { this.say(feedSpirit(sst.id)); if (!inventory[this.invSel]) this.invSel = -1; saveGame(); return; }
+      if (this.map.corr && sst && (ITEMS[sst.id].warp || ITEMS[sst.id].heal || ITEMS[sst.id].buff) && inside({ x, y }, useBtn())) { this.say('시련 중에는 물약과 두루마리를 쓸 수 없어요!'); return; }
+      if (sst && ITEMS[sst.id].warp && inside({ x, y }, useBtn())) { this.useScroll(); return; }
       if (sst && (ITEMS[sst.id].heal || ITEMS[sst.id].buff) && inside({ x, y }, useBtn())) {
         const nm = ITEMS[sst.id].name, r = usePotion(sst.id);
         if (r && r.buff) { this.say(`${nm}을 마셨다! 다음 전투에서 효과가 나타나요`); if (!inventory[this.invSel]) this.invSel = -1; saveGame(); }
@@ -3849,6 +3975,7 @@ const Field = {
       if (m.mobs) for (const b of m.mobs) if (b.alive && Math.floor(b.y / T) === y) drawMob(c, b, t);
       if (y === prow && !(this.invuln > 0 && Math.floor(t * 16) % 2)) { drawPlayer(c, t); drawSpiritField(c, t); }
     }
+    if (m.corr) this.corrDraw(c, t);
     if (m.tint) { c.fillStyle = m.tint; c.fillRect(this.cam.x - 2, this.cam.y - 2, W + 4, VIEW_H + 4); }
     if (m.dark) { c.fillStyle = 'rgba(25,10,45,.22)'; c.fillRect(this.cam.x - 2, this.cam.y - 2, W + 4, VIEW_H + 4); }
     for (const sg of m.signs || []) {
@@ -3900,6 +4027,7 @@ const Field = {
       text(c, m.name, W / 2, by + 26, 22, '#3a2410');
       c.globalAlpha = 1;
     }
+    if (m.corr) { const C = m.corr, s = `시련 ${C.lv}단계 · 출구까지 ${Math.max(0, Math.ceil((C.endX - player.x) / T))}칸 · 맞으면 체력 절반`; c.font = font(15); const bw = c.measureText(s).width + 26; c.fillStyle = 'rgba(30,15,45,.78)'; rr(c, 10, 70, bw, 30, 8); c.fill(); text(c, s, 10 + bw / 2, 86, 15, '#ffe9b0'); }
     QM.render(c, t);
     if (this.hintT > 0 && !(IS_TOUCH && fjoy.used)) {
       const hs = IS_TOUCH ? '화면 왼쪽을 누른 채 끌어서 이동' : 'WASD · 방향키로 이동', hw = IS_TOUCH ? 250 : 190;
@@ -4088,7 +4216,7 @@ const BATTLE_BTNS = [
   { id: 'item', label: '아이템', sub: '물약', key: '3' },
   { id: 'flee', label: '도망가기', key: '4' }
 ].map((b, i) => ({ ...b, x: 398 + i * 100, y: H - HUD_H + 24, w: 94, h: 80 }));
-let BPX = 230, BMX = 572; const BPY = 432, BMY = 290, HERO_BS = 1.3;
+let BPX = 230, BMX = 572, BMX0 = 572; let BMY = 290; const BPY = 432, BMY0 = 290, HERO_BS = 1.3;
 const FX = {
   fire:  { core: '#ff6a1a', hi: '#ffe066', trail: ['#ff3b1a', '#ff8a2a', '#ffd23f'] },
   ice:   { core: '#6fc3ff', hi: '#ffffff', trail: ['#bfe8ff', '#ffffff', '#7fd0ff'] },
@@ -4111,14 +4239,17 @@ function drawPed(c, area, x, y, w) {          // 전투 받침: 장소에 맞는
   const r = ENC.ready && ENC.r['p_' + k]; if (!r) return false;
   const h = w * 0.5; c.drawImage(ENC.img, r[0], r[1], r[2], r[3], x - w / 2, y - h * 0.42, w, h); return true;
 }
+const PEDK = ['garden', 'forest', 'cave', 'library', 'volcano', 'ruins', 'under', 'tower'];
+const hasPed = (area) => !!(ENC.ready && ENC.r['p_' + (PEDK.includes(area) ? area : 'garden')]);
 function buildBattleBg(area) {
+  const ped = hasPed(area);          // 받침 그림이 있으면 배경에 따로 받침/그림자를 그리지 않음 (겹침 방지)
   const b = document.createElement('canvas'); b.width = W; b.height = VIEW_H; const c = b.getContext('2d');
   const BGI = { forest: FBG, cave: CBG, under: C4BG, tower: C5BG, library: LIBBG, volcano: VOLBG, ruins: RUNBG }[area];
   if (BGI && BGI.complete && BGI.naturalWidth) {   // 받은 숲 전투 배경을 화면 높이에 맞춰 채움
     const k = Math.max(W / BGI.naturalWidth, VIEW_H / BGI.naturalHeight), w = BGI.naturalWidth * k, h = BGI.naturalHeight * k;
     c.imageSmoothingEnabled = false; c.drawImage(BGI, (W - w) / 2, VIEW_H - h, w, h);
     c.fillStyle = 'rgba(20,10,40,.15)'; c.fillRect(0, 0, W, VIEW_H);
-    for (const [x, y, rx, ry] of [[BMX, BMY, 118, 28], [BPX, BPY, 150, 36]]) { c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(x, y + 4, rx, ry, 0, 0, Math.PI * 2); c.fill(); }
+    if (!ped) for (const [x, y, rx, ry] of [[BMX, BMY, 118, 28], [BPX, BPY, 150, 36]]) { c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(x, y + 4, rx, ry, 0, 0, Math.PI * 2); c.fill(); }
     return b;
   }
   let g = c.createLinearGradient(0, 0, 0, 220); g.addColorStop(0, '#9fd4ef'); g.addColorStop(1, '#e6f4dc');
@@ -4143,10 +4274,11 @@ function buildBattleBg(area) {
     c.fillStyle = '#98c873'; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fill();
     c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 2; c.beginPath(); c.ellipse(x, y, rx - 8, ry - 4, 0, Math.PI * 1.05, Math.PI * 1.95); c.stroke();
   };
-  plat(BMX, BMY, 118, 28); plat(BPX, BPY, 150, 36);
+  if (!ped) { plat(BMX, BMY, 118, 28); plat(BPX, BPY, 150, 36); }
   return b;
 }
 
+const MULTI = { library: [0.22, 0], volcano: [0.28, 0], ruins: [0.3, 0], under: [0.35, 0], tower: [0.35, 0] };   // 지역별 [2마리 확률, 3마리 확률]
 const Battle = {
   enter(arg) { this.starMsg = null; this.mStarMsg = null; this.spShield = 0;
     this.mob = arg.mob; this.info = MOB_INFO[arg.mob.type];
@@ -4161,15 +4293,56 @@ const Battle = {
     const hpMax = this.info.hp;              // 몬스터 능력치는 고정 (숲 몬스터는 정원의 1.5배)
     this.atkR = this.info.atk.slice();
     this.potWait = false; this.potUsed = 0; this.spG = 0; this.spUses = 0; this.spFree = false; this.spShieldN = 0; this.big = null; this.spReady = null; this.freeCast = false; this.chill = false; this.atkPass = false; syncSkills(); this.usedMagic = false; this.guarding = false; this.menu = false; this.bossTurn = 0; this.special = false; this.bossAppeared = false; this.shardMsg = ''; this.studyMsg = ''; this.wave = null; this.spShot = null; this.ice = null; this.caveMsg = '';
-    this.e = { hp: hpMax, max: hpMax, ox: 0, oy: 0, kb: 0, flash: 0, pose: 'idle', pk: 0, alpha: 1, rot: 0, sc: 1, hurtUntil: 0 };
+    this.mob0 = arg.mob; this.spBefore = spellsKnown(); this.packExp = 0; this.packLoot = ''; this.packUp = false; this.partial = false;
+    const mkE = (hp) => ({ hp, max: hp, ox: 0, oy: 0, kb: 0, flash: 0, pose: 'idle', pk: 0, alpha: 1, rot: 0, sc: 1, hurtUntil: 0 });
+    const nMul = this.multiCount(arg.mob, this.info);          // 한 번에 덤비는 적 수 (보통 1)
+    if (nMul > 1) { const ak = nMul > 2 ? 0.7 : 0.8; this.info = { ...this.info, hp: Math.round(this.info.hp * 0.9), atk: this.info.atk.map(v => Math.round(v * ak)), exp: Math.round(this.info.exp * 0.85) }; }
+    this.e = mkE(nMul > 1 ? this.info.hp : hpMax); this.atkR = this.info.atk.slice();
+    this.recs = [{ info: this.info, e: this.e, mob: arg.mob, atkR: this.atkR, off: { x: 0, y: 0 }, dead: false }];
+    if (nMul > 1) {
+      const pool = Object.keys(MOB_INFO).filter(k => !MOB_INFO[k].boss && MOB_INFO[k].area === this.info.area), ak = nMul > 2 ? 0.7 : 0.8;
+      for (let i = 1; i < nMul; i++) {
+        const type = pool[Math.floor(Math.random() * pool.length)], bi = MOB_INFO[type], info = { ...bi, hp: Math.round(bi.hp * 0.9), atk: bi.atk.map(v => Math.round(v * ak)), exp: Math.round(bi.exp * 0.85) };
+        this.recs.push({ info, e: mkE(info.hp), mob: { type, grass: true, area: this.info.area, alive: true, x: arg.mob.x, y: arg.mob.y, vx: 0, vy: 0, t: 1e9, anim: 0 }, atkR: info.atk.slice(), off: { x: 0, y: 0 }, dead: false });
+      }
+      const SL = nMul > 2 ? [{ x: -100, y: 58 }, { x: 28, y: -46 }, { x: 140, y: 50 }] : [{ x: -72, y: 50 }, { x: 78, y: -34 }];
+      this.recs.forEach((r, i) => { r.off = SL[i]; });
+      this.recs.sort((a, b) => a.off.x - b.off.x); this.recs.forEach((r, i) => { r.off = SL[i]; });
+    }
+    this.ti = 0; this.ai = 0; this.setActive(0);
     this.p = { ox: 0, oy: 0, kb: 0, flash: 0, pose: 'idle', pk: 0, hurtUntil: 0 };
     this.ally = this.info.area === 'tower' && !!QM.get('tower');   // 5장: 레온이 동료로 함께 싸움
     this.t = 0; this.parts = []; this.nums = []; this.shots = []; this.fx = null; this.dark = 0; this.shake = 0; this.circle = 0; this.lvUp = false; this.fount = 0; this.finishing = false;
     this.setPhase('intro', 1.2);
-    this.say(`${iga((arg.mob.gold ? '황금 ' : '') + this.info.name)} 나타났다!` + (player.buffs.atk > 1 || player.buffs.def > 0 ? '  (비약 효과 적용 중)' : ''));
+    this.say(nMul > 1 ? `몬스터 ${nMul}마리가 함께 덤빈다!` : `${iga((arg.mob.gold ? '황금 ' : '') + this.info.name)} 나타났다!` + (player.buffs.atk > 1 || player.buffs.def > 0 ? '  (비약 효과 적용 중)' : ''));
     if (arg.mob.chal) this.msg = `[도전의 탑 ${arg.mob.floor}층] ` + this.msg;
     else if (arg.mob.grass) this.msg = '풀숲에서 ' + this.msg;
     if (this.eased) this.msg += ' (여러 번 도전했더니 상대가 지쳐 보인다…)';
+  },
+  // ---------------- 여러 마리 전투: 적마다 따로 체력·턴, 지금 다루는 적(this.e)만 바꿔 끼우는 방식 ----------------
+  multiCount(mob, info) {
+    if (typeof window !== 'undefined' && window.FORCE_MULTI) return info.boss ? 1 : window.FORCE_MULTI;
+    if (info.boss || mob.chal || mob.rematch || mob.gold || mob.jack || mob.mut || mob.guard !== undefined || mob.vcry !== undefined || !MULTI[info.area]) return 1;
+    const [p2, p3] = MULTI[info.area], r = Math.random();
+    return r < p3 ? 3 : r < p3 + p2 ? 2 : 1;
+  },
+  setActive(i) { const r = this.recs[i]; if (!r) return; this.ai = i; this.e = r.e; this.info = r.info; this.atkR = r.atkR; this.mob = r.mob; BMX = BMX0 + r.off.x; BMY = BMY0 + r.off.y; },
+  alive() { return this.recs.map((r, i) => i).filter(i => !this.recs[i].dead); },
+  setTarget(i, quiet) { const r = this.recs[i]; if (!r || r.dead) return; const ch = this.ti !== i; this.ti = i; this.setActive(i); if (ch && !quiet && this.recs.length > 1) { Sound.sfx('click'); this.say(`${iga(r.info.name)} 목표! 무엇을 할까?`); } },
+  cycleTarget() { const al = this.alive(); if (al.length < 2) return; this.setTarget(al[(al.indexOf(this.ti) + 1) % al.length]); },
+  startEnemyTurn(dur = 1.0) { this.queue = this.alive(); this.qi = 0; this.setActive(this.queue[0]); this.setPhase('eWait', dur); },
+  nextEnemy(msg) {
+    this.qi++;
+    if (this.qi < this.queue.length) { this.setActive(this.queue[this.qi]); this.setPhase('eWait', 0.45); if (msg) this.say(msg); }
+    else { if (this.recs[this.ti].dead) this.ti = this.alive()[0]; this.setActive(this.ti); this.setPhase('command'); this.say((msg ? msg + ' ' : '') + '무엇을 할까?'); }
+  },
+  enemyDown() {                                 // 한 마리 쓰러짐: 남았으면 보상만 주고 이어서 싸움
+    this.recs[this.ai].dead = true;
+    const left = this.alive();
+    if (!left.length) { this.winBattle(); this.mob = this.mob0; return; }
+    this.partial = true; this.winBattle(); this.partial = false;
+    this.ti = left[0]; this.setActive(this.ti); this.startEnemyTurn(0.6);
+    this.say(`${left.length}마리 남았다!`);
   },
   say(m) { this.msg = m; },
   setPhase(ph, dur = 0) { this.phase = ph; this.pt = 0; this.pdur = dur; this.done = {}; },
@@ -4243,6 +4416,7 @@ const Battle = {
   spAdd(n) { if (!n || !player.spirit) return; const was = this.spG >= 100; this.spG = Math.min(100, (this.spG || 0) + n); if (!was && this.spG >= 100) { this.say(`${iga(SPIRITS[player.spirit.kind].name)} 힘이 가득 찼다! 빛나는 정령을 누르면 필살기 (내 차례를 써요)`); Sound.sfx('fanfare'); this.spReady = { t: 0 }; this.burst(BPX - 92, BPY - 100, ['#fff3a0', '#ffd23f', SPIRITS[player.spirit.kind].color], 26, 220, 4); } },
   battleTip() {                                 // 처음 겪는 규칙은 전투 시작 때 한 번 알려 준다
     const tp = player.tips = player.tips || {}, k = player.element.key, e = this.info.el;
+    if (this.recs.length > 1 && !tp.multi) { tp.multi = 1; return `몬스터가 ${this.recs.length}마리! 적을 눌러 목표를 고를 수 있어요. 남은 적은 차례로 공격해요`; }
     if (player.spirit && !tp.sp) { tp.sp = 1; return '정령 게이지: 공격·방어하면 차올라요. 가득 차서 정령이 빛나면 눌러서 필살기!'; }
     if (!tp.el && e && e !== 'none' && elMult(k, e) !== 1) { tp.el = 1; return elMult(k, e) > 1 ? '상성 우위! 마법 버튼의 ▲ 표시 = 잘 듣는 마법 (얼음▶불꽃▶대지▶얼음)' : '상성 불리… ▼ 표시 마법은 잘 안 들어요. 같은 속성끼리도 별로예요'; }
     return null;
@@ -4425,7 +4599,7 @@ const Battle = {
     if (this.atkPass) { this.atkPass = false; this.spPassive(); }
     if (this.e.hp <= 0) { this.setPhase('eDie', 1.0); this.say(`${iga(this.info.name)} 쓰러졌다!`); }
     else if (this.ally) this.setPhase('lAct', 1.1);
-    else this.setPhase('eWait', 1.0);
+    else this.startEnemyTurn(1.0);
   },
   spiritAct() {                                 // 정령 필살기: 모든 정령이 공격하고, 정령마다 다른 효과가 붙는다
     const sp = player.spirit, info = SPIRITS[sp.kind], g = spGrow(sp), sx = BPX - 92, sy = BPY - 150;
@@ -4450,11 +4624,11 @@ const Battle = {
     else if (r === 'mix') { const h = Math.min(Math.round(player.maxHp * 0.015 * g), player.maxHp - player.hp), m = Math.min(Math.round(player.maxMp * 0.02 * g), player.maxMp - player.mp); player.hp += h; player.mp += m; if (h > 0 || m > 0) this.num(BPX - 30, BPY - 140, `+${h} · +${m} MP`, '#e8d07a'); }
   },
   winBattle() {
-    const bonus = Math.min(5, player.streak) * 0.1;     // 연승 보너스: 1연승마다 경험치 +10% (최대 +50%)
-    const expK = expScale(this.info), exp = Math.round(this.info.exp * (1 + bonus) * (this.mob.jack ? 3 : this.mob.gold ? 1.5 : 1) * expK * EXP_RATE), before = spellsKnown(); this.lvUp = gainExp(exp);
-    player.streak++; const spMsg = spiritGain(this.info.boss ? 15 : 4);
+    const part = this.partial, bonus = Math.min(5, player.streak) * 0.1;     // 연승 보너스: 1연승마다 경험치 +10% (최대 +50%)
+    const expK = expScale(this.info), exp = Math.round(this.info.exp * (1 + bonus) * (this.mob.jack ? 3 : this.mob.gold ? 1.5 : 1) * expK * EXP_RATE), before = this.spBefore || spellsKnown(); if (gainExp(exp)) this.packUp = true; this.lvUp = this.packUp; this.packExp += exp;
+    if (!part) player.streak++; const spMsg = spiritGain(this.info.boss ? 15 : 4);
     player.kills = player.kills || {}; this.codexNew = !codexSeen(this.mob.type); player.kills[this.mob.type] = (player.kills[this.mob.type] || 0) + 1;
-    this.mob.alive = false; this.mob.deadAt = performance.now();
+    this.mob.alive = false; this.mob.deadAt = performance.now(); if (!part && this.mob0) { this.mob0.alive = false; this.mob0.deadAt = performance.now(); }
     const q = QM.get(this.info.quest || 'garden'); let loot;
     if (this.info.boss) {                       // 보스 보상 즉시 지급, 퀘스트는 보고 단계로
       loot = '';
@@ -4514,8 +4688,10 @@ const Battle = {
         if (q.count >= q.goal) { q.stage = 'boss'; syncBoss(); this.bossAppeared = 'garden'; }
       }
     }
+    if (part) { this.packLoot += loot; return; }
+    loot = this.packLoot + loot; this.packLoot = '';
     this.setPhase('win'); this.p.pose = 'win'; Sound.sfx('win'); if (this.lvUp) setTimeout(() => Sound.sfx('levelup'), 700);
-    this.say(`${this.info.boss ? this.info.name + (hasBatchim(this.info.name) ? '을' : '를') + ' 물리쳤다!' : '전투 승리!'}${player.streak >= 2 ? ` ${player.streak}연승!` : ''} ${exp} EXP${bonus ? `(+${Math.round(bonus * 100)}%)` : ''}${loot} 획득` + (this.lvUp ? `  ·  레벨 업! Lv.${player.lv}${newSpellText(before)}` : ''));
+    this.say(`${this.info.boss ? this.info.name + (hasBatchim(this.info.name) ? '을' : '를') + ' 물리쳤다!' : '전투 승리!'}${player.streak >= 2 ? ` ${player.streak}연승!` : ''} ${this.packExp} EXP${bonus ? `(+${Math.round(bonus * 100)}%)` : ''}${loot} 획득` + (this.lvUp ? `  ·  레벨 업! Lv.${player.lv}${newSpellText(before)}` : ''));
     if (spMsg) this.msg += spMsg;
     if (this.codexNew) this.msg += '  ·  도감 등록!' + Field.errandKill('codex');
     if (expK < 1) this.msg += '  ·  레벨 차이로 경험치 감소';
@@ -4575,14 +4751,15 @@ const Battle = {
   update(dt) {
     this.t += dt; this.pt += dt;
     const ph = this.phase, pt = this.pt, k = this.pdur ? Math.min(1, pt / this.pdur) : 0, a = this.e, p = this.p;
-    this.shake = Math.max(0, this.shake - dt); a.flash = Math.max(0, a.flash - dt); p.flash = Math.max(0, p.flash - dt);
-    a.kb = Math.max(0, a.kb - dt * 3); p.kb = Math.max(0, p.kb - dt * 3); this.fount = Math.max(0, this.fount - dt);
+    this.shake = Math.max(0, this.shake - dt); p.flash = Math.max(0, p.flash - dt);
+    for (const r of this.recs) { r.e.flash = Math.max(0, r.e.flash - dt); r.e.kb = Math.max(0, r.e.kb - dt * 3); }
+    p.kb = Math.max(0, p.kb - dt * 3); this.fount = Math.max(0, this.fount - dt);
     if (!fader.phase) {
       if (ph === 'command' && this.menu) {
         ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].forEach((k, i) => { if (pressed[k]) this.useBattleItem(i); });
         if (pressed.Escape) { this.menu = false; this.say('무엇을 할까?'); }
       } else if (ph === 'command') {
-        if (pressed.Digit1) this.act('attack'); if (pressed.Digit2) this.act('guard'); if (pressed.Digit3) this.act('item'); if (pressed.Digit4) this.act('flee'); if (pressed.KeyE) this.act('spirit');
+        if (pressed.Digit1) this.act('attack'); if (pressed.Digit2) this.act('guard'); if (pressed.Digit3) this.act('item'); if (pressed.Digit4) this.act('flee'); if (pressed.KeyE) this.act('spirit'); if (pressed.KeyQ) this.cycleTarget();
         ['Digit5', 'Digit6', 'Digit7', 'Digit8'].forEach((k, i) => { if (pressed[k]) this.castSlot(this.spellRows()[i]); });
       }
       if ((ph === 'win' || ph === 'lose' || ph === 'fleeOk') && pt > 1 && (pressed.Space || pressed.Enter)) this.finish();
@@ -4616,7 +4793,7 @@ const Battle = {
         if (pt >= this.pdur) { p.pose = 'idle'; if (this.mStarMsg) { this.num(BPX, BPY - 170, '숙련 UP!', '#ffe066'); Sound.sfx('heal'); this.say(this.mStarMsg); this.starMsg = this.mStarMsg; this.mStarMsg = null; } this.afterPlayer(); }
       } break;
       case 'eWait': if (k >= 1) {
-        if (!this.info.boss && this.e.frozen) { this.e.frozen = false; this.guarding = false; this.burst(BMX, BMY - 42, ['#bfe8ff', '#ffffff'], 14, 120, 3); this.setPhase('command'); this.say(`${iga(this.info.name)} 얼어서 움직이지 못한다! 무엇을 할까?`); break; }
+        if (!this.info.boss && this.e.frozen) { this.e.frozen = false; this.guarding = false; this.burst(BMX, BMY - 42, ['#bfe8ff', '#ffffff'], 14, 120, 3); this.nextEnemy(`${iga(this.info.name)} 얼어서 움직이지 못한다!`); break; }
         if (this.info.boss) {                   // 보스 3턴 주기: 박치기 → 부풀기(예고, 공격 없음) → 1.5배 덮치기
           const step = this.bossTurn++ % 3;
           if (this.info.kind === 'rival') {       // 레온: 얼음 화살 → 얼음 화살 → 1.5배 빙결 폭풍
@@ -4755,15 +4932,15 @@ const Battle = {
         if (k >= 1) {
           a.ox = a.oy = 0; a.pose = 'idle'; this.special = false; this.guarding = false; a.charged = false; a.veiled = false; a.armor = false; a.reflect = false; this.wave = null; this.ice = null;
           if (player.hp <= 0) { Sound.sfx('lose'); this.setPhase('lose'); p.pose = 'faint'; this.say('눈앞이 캄캄해졌다…'); }
-          else { this.setPhase('command'); this.say('무엇을 할까?'); }
+          else this.nextEnemy();
         }
       } break;
       case 'eDie': {
         if (this.info.kind === 'rival' || this.info.kind === 'azka') { a.pose = 'faint'; a.fk = k < 0.45 ? 0 : 1; a.alpha = 1 - Math.max(0, k - 0.6) * 1.5; } else { a.rot += dt * 14; a.sc = 1 - k * 0.75; a.alpha = 1 - k; }
         if (Math.random() < 0.7) this.parts.push({ x: BMX + (Math.random() - 0.5) * 70, y: BMY - 40 + (Math.random() - 0.5) * 60, vx: 0, vy: -60, life: 0.6, age: 0, col: '#fff3a0', r: 3, g: 0, star: true });
-        if (k >= 1) this.winBattle();
+        if (k >= 1) this.enemyDown();
       } break;
-      case 'fleeFail': if (k >= 1) this.setPhase('eWait', 0.4); break;
+      case 'fleeFail': if (k >= 1) this.startEnemyTurn(0.4); break;
       case 'pItem': if (k >= 1) this.afterPlayer(); break;
       case 'sAct': {
         if (pt >= 0.25 && !this.spDone) { this.spDone = true; this.spiritAct(); }
@@ -4771,7 +4948,7 @@ const Battle = {
         if (s) { s.t += dt; const q = Math.min(1, s.t / 0.45); s.x = BPX - 92 + (BMX - (BPX - 92)) * q; s.y = BPY - 150 + (BMY - 42 - (BPY - 150)) * q - Math.sin(q * Math.PI) * 40;
           this.fxP({ x: s.x, y: s.y, vx: -60, vy: (Math.random() - 0.5) * 30, life: 0.3, col: (s.col || ['#ffb03a'])[0], r: 3 });
           if (q >= 1) { this.spShot = null; this.burst(BMX, BMY - 42, s.col || ['#ff6a1a', '#ffe066'], 16, 200, 3.5); this.shake = Math.max(this.shake, 0.3); this.hitEnemy(s.v, 1); } }
-        if (k >= 1 && !this.spShot) { if (this.e.hp <= 0) { this.setPhase('eDie', 1.0); this.say(`${iga(this.info.name)} 쓰러졌다!`); } else if (this.spFree) { this.spFree = false; this.setPhase('command'); this.say('무엇을 할까?'); } else if (this.ally) this.setPhase('lAct', 1.1); else this.setPhase('eWait', 0.6); }
+        if (k >= 1 && !this.spShot) { if (this.e.hp <= 0) { this.setPhase('eDie', 1.0); this.say(`${iga(this.info.name)} 쓰러졌다!`); } else if (this.spFree) { this.spFree = false; this.setPhase('command'); this.say('무엇을 할까?'); } else if (this.ally) this.setPhase('lAct', 1.1); else this.startEnemyTurn(0.6); }
       } break;
       case 'lAct': {                             // 레온의 얼음 화살
         if (this.once('say')) this.say('레온의 얼음 화살!');
@@ -4779,7 +4956,7 @@ const Battle = {
         if (pt >= 0.35 && pt < 0.8) { const q = (pt - 0.35) / 0.45; this.ice = { x: sx + (gx - sx) * q, y: sy + (gy - sy) * q - Math.sin(q * Math.PI) * 30 };
           this.fxP({ x: this.ice.x, y: this.ice.y, vx: -60, vy: (Math.random() - 0.5) * 40, life: 0.3, col: Math.random() < 0.5 ? '#bfe8ff' : '#ffffff', r: 3 }); }
         else if (pt >= 0.8 && this.once('hit')) { this.ice = null; this.burst(BMX, BMY - 50, ['#bfe8ff', '#7fd0ff', '#ffffff'], 14, 190, 3); this.hitEnemy(rand(14, 20) + Math.round(player.lv / 2), 1); }
-        if (k >= 1) { if (this.e.hp <= 0) { this.setPhase('eDie', 1.0); this.say(`${iga(this.info.name)} 쓰러졌다!`); } else this.setPhase('eWait', 0.5); }
+        if (k >= 1) { if (this.e.hp <= 0) { this.setPhase('eDie', 1.0); this.say(`${iga(this.info.name)} 쓰러졌다!`); } else this.startEnemyTurn(0.5); }
       } break;
     }
     if (!this.fx) this.dark = Math.max(0, this.dark - dt * 3);
@@ -4797,6 +4974,7 @@ const Battle = {
       if (this.menu === 'item') for (const r of this.itemRows()) if (inside({ x, y }, r)) { this.useBattleItem(r.i); return; }
       if (player.spirit && inside({ x, y }, this.spBtn())) { this.act('spirit'); return; }
       for (const b of BATTLE_BTNS) if (inside({ x, y }, b)) { this.act(b.id); return; }
+      if (this.recs.length > 1) for (const i of this.alive()) { const r = this.recs[i], bx = BMX0 + r.off.x, by = BMY0 + r.off.y; if (Math.abs(x - bx) < 62 && y > by - 150 && y < by + 46) { this.menu = false; this.setTarget(i); return; } }
       if (this.menu) { this.menu = false; this.say('무엇을 할까?'); return; }
     }
     if ((this.phase === 'win' || this.phase === 'lose' || this.phase === 'fleeOk') && this.pt > 1) this.finish();
@@ -4823,16 +5001,8 @@ const Battle = {
     }
     c.restore();
   },
-  render(c) {
-    const area = this.info.area || 'garden';
-    if (!battleBg || battleBg.area !== area) { battleBg = buildBattleBg(area); battleBg.area = area; }
-    const t = this.t, a = this.e, p = this.p, info = this.info;
-    c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
-    c.save();
-    if (this.shake > 0) c.translate((Math.random() - 0.5) * 12 * this.shake / 0.3, (Math.random() - 0.5) * 8 * this.shake / 0.3);
-    c.drawImage(battleBg, 0, 0);
-    if (this.dark > 0) { c.fillStyle = `rgba(10,5,30,${0.5 * this.dark})`; c.fillRect(0, 0, W, VIEW_H); }
-    // 몬스터
+  drawEnemy(c) {
+    const t = this.t, a = this.e, info = this.info;
     const ms = mobArt(this.mob.type), ex = BMX + a.ox + a.kb * 22, ey = BMY + a.oy;
     { c.globalAlpha = Math.max(0.35, a.alpha); drawPed(c, this.info.area, BMX, BMY + 4, clamp(170 * (info.scale || 1), 150, 240)); c.globalAlpha = 1; }
     if (a.alpha > 0.02) {
@@ -4873,6 +5043,25 @@ const Battle = {
         c.filter = 'none'; c.restore();
       }
     }
+  },
+  render(c) {
+    const area = this.info.area || 'garden';
+    if (!battleBg || battleBg.area !== area || battleBg.ped !== hasPed(area)) { battleBg = buildBattleBg(area); battleBg.area = area; battleBg.ped = hasPed(area); }
+    const t = this.t, a = this.e, p = this.p, info = this.info;
+    c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+    c.save();
+    if (this.shake > 0) c.translate((Math.random() - 0.5) * 12 * this.shake / 0.3, (Math.random() - 0.5) * 8 * this.shake / 0.3);
+    c.drawImage(battleBg, 0, 0);
+    if (this.dark > 0) { c.fillStyle = `rgba(10,5,30,${0.5 * this.dark})`; c.fillRect(0, 0, W, VIEW_H); }
+    // 몬스터 (여러 마리면 뒤쪽부터 차례로)
+    { const keep = this.ai, order = this.recs.map((r, i) => i).sort((x, y) => this.recs[x].off.y - this.recs[y].off.y);
+      for (const i of order) { this.setActive(i); this.drawEnemy(c); }
+      this.setActive(keep);
+      if (this.recs.length > 1 && this.phase === 'command' && this.recs[this.ti] && !this.recs[this.ti].dead) {   // 목표 표시: 발밑 고리 + 머리 위 화살표
+        const r = this.recs[this.ti], bx = BMX0 + r.off.x, by = BMY0 + r.off.y, pu = 0.5 + 0.5 * Math.sin(t * 6);
+        c.strokeStyle = `rgba(255,230,90,${0.6 + 0.4 * pu})`; c.lineWidth = 4; c.beginPath(); c.ellipse(bx, by + 6, 62 + pu * 4, 17 + pu * 2, 0, 0, Math.PI * 2); c.stroke();
+        const ay = by - 138 - Math.abs(Math.sin(t * 5)) * 7; c.fillStyle = '#ffd23f'; c.strokeStyle = '#5a2a06'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(bx - 11, ay - 12); c.lineTo(bx + 11, ay - 12); c.lineTo(bx, ay + 6); c.closePath(); c.fill(); c.stroke();
+      } }
     // 마법진
     if (this.circle > 0) {
       const col = player.element.color; c.save(); c.translate(BPX + p.ox, BPY + p.oy); c.scale(1, 0.3); c.rotate(t * 2);
@@ -4972,6 +5161,15 @@ const Battle = {
     }
     c.restore();
     // 적 이름 · HP
+    if (this.recs.length > 1) {
+      for (const r of this.recs) { if (r.dead || r.e.alpha < 0.05) continue;
+        const bx = BMX0 + r.off.x, by = BMY0 + r.off.y, px = bx - 62, py = by + 16, f = r.e.hp / r.e.max, isT = this.recs[this.ti] === r && this.phase === 'command';
+        c.fillStyle = isT ? 'rgba(255,238,170,.97)' : 'rgba(244,230,198,.93)'; rr(c, px, py, 124, 34, 4); c.fill(); c.strokeStyle = isT ? '#e0541a' : '#8a6a3c'; c.lineWidth = isT ? 2.5 : 1.5; c.stroke();
+        textFit(c, r.info.name, px + 8, py + 11, 84, 12, '#3a2410', null, 0, 'left');
+        if (!eIcon(c, r.info.el, px + 108, py + 11, 24)) text(c, { fire: '불', ice: '얼음', earth: '대지', none: '무' }[r.info.el] || '', px + 112, py + 11, 11, '#8a6a3c', null, 0, 'right');
+        c.fillStyle = '#2a1608'; c.fillRect(px + 8, py + 21, 108, 8); c.fillStyle = f > 0.3 ? '#5aae4a' : '#d8402a'; c.fillRect(px + 9, py + 22, Math.max(2, 106 * f), 6);
+      }
+    } else
     if (a.alpha > 0.05) {
       const px = this.info.boss ? BMX - 290 : BMX - 84, py = BMY - 150;
       if (!ui9(c, 'plaque', px - 6, py - 4, 180, 54, 12, 10)) { c.fillStyle = 'rgba(244,230,198,.95)'; rr(c, px, py, 168, 46, 3); c.fill(); }
@@ -5110,7 +5308,7 @@ function layoutUI() {
   BATTLE_BTNS.forEach((b, i) => { b.x = W - 402 + i * 100; });
   PANEL.x = ox + 230; PANEL_X.x = PANEL.x + PANEL.w - 46; RESET_BTN.x = PANEL.x + 40;
   DLG.x = ox + 40;
-  BPX = ox + 230; BMX = ox + 572;
+  BPX = ox + 230; BMX = ox + 572; BMX0 = BMX; BMY = BMY0; if (typeof Battle !== 'undefined' && Battle.recs) Battle.setActive(Battle.ai);
   hudCache = null; battleBg = null;
   layoutDirty = false;
 }
